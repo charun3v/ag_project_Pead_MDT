@@ -165,7 +165,7 @@ def patient_create(request):
 @login_required
 def patient_edit(request, mr_no):
     patient = get_object_or_404(Patient, mr_no=mr_no)
-    is_admin = hasattr(request.user, 'profile') and request.user.profile.role == 'Admin'
+    is_admin = hasattr(request.user, 'profile') and request.user.profile.role in ['Admin', 'SubAdmin']
 
     if patient.is_locked and not is_admin:
         messages.error(request, "This patient record is locked. Only an Administrator can unlock and edit demographics.")
@@ -433,6 +433,7 @@ def consensus_edit(request, consensus_id):
         form = MDTConsensusForm(instance=consensus)
 
     investigations = get_consolidated_investigations(clinical)
+    doctors = UserProfile.objects.filter(role__in=['Consultant', 'Resident', 'Admin', 'SubAdmin']).select_related('user').order_by('full_name')
 
     context = {
         'form': form,
@@ -441,6 +442,7 @@ def consensus_edit(request, consensus_id):
         'patient': patient,
         'is_approved': is_approved,
         'investigations': investigations,
+        'doctors': doctors,
     }
     return render(request, 'mdt/consensus_form.html', context)
 
@@ -468,11 +470,14 @@ def live_presentation(request, consensus_id):
         messages.success(request, "Real-time meeting notes updated.")
         return redirect('live_presentation', consensus_id=consensus.consensus_id)
 
+    doctors = UserProfile.objects.filter(role__in=['Consultant', 'Resident', 'Admin', 'SubAdmin']).select_related('user').order_by('full_name')
+
     context = {
         'consensus': consensus,
         'clinical': clinical,
         'patient': patient,
         'investigations': investigations,
+        'doctors': doctors,
     }
     return render(request, 'mdt/live_presentation.html', context)
 
@@ -527,7 +532,7 @@ def report_mdt_full(request, consensus_id):
 
 @login_required
 def audit_log_view(request):
-    is_admin = hasattr(request.user, 'profile') and request.user.profile.role == 'Admin'
+    is_admin = hasattr(request.user, 'profile') and request.user.profile.role in ['Admin', 'SubAdmin']
     if not is_admin and not request.user.is_superuser:
         return HttpResponseForbidden("Access Denied: Only Administrators can inspect audit logs.")
 

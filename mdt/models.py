@@ -95,15 +95,23 @@ class MolecularTestType(models.Model):
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('Admin', 'Administrator'),
-        ('Consultant', 'Consultant / Oncologist'),
-        ('Scribe', 'Fellow / Resident / Scribe'),
+        ('SubAdmin', 'Sub Administrator'),
+        ('Consultant', 'Consultant Oncologist'),
+        ('Resident', 'Resident / Fellow'),
+        ('Front Desk', 'Front Desk'),
+        ('Physics', 'Medical Physics'),
+        ('Nursing', 'Nursing Staff'),
+        ('User', 'General User'),
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='Consultant')
+    user_level = models.CharField(max_length=50, blank=True, null=True)
+    prefix = models.CharField(max_length=20, default='Dr.', blank=True, null=True)
     full_name = models.CharField(max_length=150, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.user.username} ({self.role})"
+        pfx = f"{self.prefix} " if self.prefix else ""
+        return f"{pfx}{self.full_name or self.user.username} ({self.role})"
 
 
 # ==========================================

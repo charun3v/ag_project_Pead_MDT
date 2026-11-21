@@ -158,6 +158,16 @@
           <div class="mb-2">
             <label class="form-label-compact" for="{{ form.attendees.id_for_label }}">Participating Specialists / MDT Panel</label>
             {{ form.attendees }}
+            {% if not is_approved and doctors %}
+            <div class="mt-1 small text-muted">
+              <span class="fw-semibold" style="font-size: 0.72rem;">Quick-add panel:</span>
+              {% for doc in doctors|slice:":10" %}
+              <button type="button" class="btn btn-light border btn-sm py-0 px-1 me-1 mb-1 text-dark" style="font-size: 0.7rem;" onclick="addAttendee('{{ doc.full_name|default:doc.user.username }}')">
+                + {{ doc.full_name|default:doc.user.username }}
+              </button>
+              {% endfor %}
+            </div>
+            {% endif %}
           </div>
 
           <div class="mb-2">
@@ -244,4 +254,18 @@
   </div>
   {% endif %}
 </form>
+{% block extra_js %}
+<script>
+function addAttendee(name) {
+  const input = document.getElementById('id_attendees');
+  if (!input) return;
+  const current = input.value.trim();
+  if (!current) {
+    input.value = name;
+  } else if (!current.includes(name)) {
+    input.value = current + ', ' + name;
+  }
+}
+</script>
+{% endblock %}
 {% endblock %}

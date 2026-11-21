@@ -46,7 +46,7 @@
               <i class="bi bi-person-plus me-1"></i> Register Patient
             </a>
           </li>
-          {% if user.is_superuser or user.profile.role == 'Admin' %}
+          {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'audit_log_view' %}active{% endif %}" href="{% url 'audit_log_view' %}">
               <i class="bi bi-shield-check me-1"></i> Audit Trail
