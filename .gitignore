@@ -1,0 +1,52 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyCharm
+.idea/
+*.iml
+
+# Local databases and backups
+db.sqlite3
+db.sqlite3-*
+*.sqlite
+*.sqlite3
+*.accdb
+*.mdb
+*.bak
+*.backup
+*.dump
+*.sql
+
+# Patient uploads and clinical documents
+media/
+uploads/
+patient_files/
+patient_data/
+backups/
+
+# Secrets and environment settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# Logs and temporary files
+*.log
+logs/
+*.tmp
+*.temp
+
+# Operating system
+.DS_Store
+Thumbs.db

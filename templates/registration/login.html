@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Login — Pead MDT System{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 70vh;">
+  <div class="col-11 col-sm-8 col-md-5 col-lg-4">
+    <div class="card card-clinical shadow-sm border-0">
+      <div class="card-header bg-primary text-white text-center py-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-shield-lock me-2"></i>Pead MDT Clinical Portal</h5>
+        <small class="text-white-50">Paediatric Oncology Multidisciplinary Team</small>
+      </div>
+      <div class="card-body p-4">
+        <form method="post" action="{% url 'login' %}">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label-compact" for="username">Username</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+              <input type="text" class="form-control form-control-sm" id="username" name="username" required autofocus placeholder="Enter your username">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label-compact" for="password">Password</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-light"><i class="bi bi-key"></i></span>
+              <input type="password" class="form-control form-control-sm" id="password" name="password" required placeholder="Enter your password">
+            </div>
+          </div>
+          <div class="d-grid mt-4">
+            <button type="submit" class="btn btn-primary btn-sm py-2 fw-semibold">
+              <i class="bi bi-box-arrow-in-right me-1"></i> Sign In to Clinical System
+            </button>
+          </div>
+        </form>
+
+        <div class="alert alert-light border small mt-3 mb-0 py-2 text-muted text-center" style="font-size: 0.74rem;">
+          <i class="bi bi-info-circle me-1"></i> Default logins: <code>admin</code> or <code>n3v</code> (Password: <code>admin123</code>)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

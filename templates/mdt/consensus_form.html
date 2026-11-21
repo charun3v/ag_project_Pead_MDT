@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}MDT Discussion — {{ consensus.mdt_id|default:clinical.patient.name }}{% endblock %}
+
+{% block content %}
+<!-- Patient Banner -->
+<div class="patient-banner shadow-sm py-2 px-3 mb-2">
+  <div class="d-flex flex-wrap justify-content-between align-items-center">
+    <div>
+      <span class="fs-6 fw-bold text-white me-2"><i class="bi bi-person-fill"></i> {{ patient.name }}</span>
+      <span class="badge bg-white text-primary me-2">MR: {{ patient.mr_no }}</span>
+      <span class="badge bg-light text-dark me-2">{{ patient.get_sex_display }}</span>
+      <span class="banner-detail"><i class="bi bi-hourglass-split me-1"></i>Age at MDT: <strong>{{ patient.format_age }}</strong></span>
+      <span class="banner-detail"><i class="bi bi-bandaid me-1"></i>Diagnosis: <strong>{{ clinical.diagnosis|default:patient.diagnosis|default:"—" }}</strong></span>
+      {% if clinical.stage %}
+      <span class="banner-detail"><i class="bi bi-flag me-1"></i>Stage: <strong>{{ clinical.stage }}</strong></span>
+      {% endif %}
+    </div>
+    <div class="mt-1 mt-md-0 d-flex align-items-center gap-2">
+      <span class="badge {% if is_approved %}bg-success text-white{% else %}bg-warning text-dark{% endif %} p-1 px-2" style="font-size: 0.76rem;">
+        MDT Status: {{ consensus.status|default:"Draft" }}
+      </span>
+      <span class="badge bg-light text-primary border p-1 px-2 fw-bold" style="font-size: 0.76rem;">
+        MDT ID: {{ consensus.mdt_id }}
+      </span>
+      <a href="{% url 'live_presentation' consensus.consensus_id %}" class="btn btn-sm btn-info text-white py-0 px-2 fw-semibold" title="Launch Presentation Screen">
+        <i class="bi bi-tv me-1"></i> Live Screen
+      </a>
+    </div>
+  </div>
+</div>
+
+<form method="post" id="consensusForm">
+  {% csrf_token %}
+
+  <div class="row g-2">
+    <!-- Left Column: Read-Only Clinical Presentation Summary & Investigations -->
+    <div class="col-12 col-xl-6">
+      
+      <!-- Clinical Summary Card -->
+      <div class="card card-clinical mb-2">
+        <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-file-earmark-medical text-primary me-1"></i> Clinical Case Summary (Read-Only)</strong>
+          <a href="{% url 'clinical_edit' clinical.clinical_id %}" class="small text-decoration-none" target="_blank">
+            <i class="bi bi-box-arrow-up-right me-1"></i> Open Clinical Record
+          </a>
+        </div>
+        <div class="card-body p-2 small">
+          <div class="row g-2 mb-2 pb-2 border-bottom">
+            <div class="col-4">
+              <span class="text-muted d-block" style="font-size: 0.72rem;">Height / Weight:</span>
+              <strong>{{ clinical.height|default:"—" }} cm / {{ clinical.weight|default:"—" }} kg</strong>
+            </div>
+            <div class="col-4">
+              <span class="text-muted d-block" style="font-size: 0.72rem;">BSA (Mosteller):</span>
+              <strong class="text-primary">{{ clinical.bsa|default:"—" }} m²</strong>
+            </div>
+            <div class="col-4">
+              <span class="text-muted d-block" style="font-size: 0.72rem;">BMI:</span>
+              <strong class="text-secondary">{{ clinical.bmi|default:"—" }} kg/m²</strong>
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <span class="text-muted d-block fw-semibold" style="font-size: 0.72rem;">MDT Discussion Purpose & Questions:</span>
+            <div class="p-1 rounded bg-light border">
+              <span class="badge bg-secondary mb-1">{{ clinical.discussion_category }}</span>
+              <div>{{ clinical.mdt_discussion_for|default:"General multidisciplinary consensus and management planning." }}</div>
+            </div>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <span class="text-muted d-block fw-semibold" style="font-size: 0.72rem;">Presenting Complaints:</span>
+              <div class="text-secondary">{{ clinical.presenting_complaints|default:"None entered." }}</div>
+            </div>
+            <div class="col-6">
+              <span class="text-muted d-block fw-semibold" style="font-size: 0.72rem;">Physical / Systemic Findings:</span>
+              <div class="text-secondary">{{ clinical.examination_findings|default:"None entered." }}</div>
+            </div>
+          </div>
+          
+          {% if clinical.prev_tx_history %}
+          <div class="mt-2 pt-1 border-top">
+            <span class="text-muted d-block fw-semibold" style="font-size: 0.72rem;">Previous Treatment History:</span>
+            <div class="text-secondary">{{ clinical.prev_tx_history }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Consolidated Chronological Investigations Table -->
+      <div class="card card-clinical">
+        <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-diagram-3 text-primary me-1"></i> All Diagnostic Investigations</strong>
+          <span class="badge bg-secondary rounded-pill">{{ investigations|length }} tests</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive" style="max-height: 290px;">
+            <table class="table table-compact table-bordered mb-0">
+              <thead class="bg-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Category & Type</th>
+                  <th>Details & Findings</th>
+                  <th>Impression</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inv in investigations %}
+                <tr>
+                  <td class="text-nowrap fw-semibold">{{ inv.date|date:"d-M-y"|default:"—" }}</td>
+                  <td>
+                    <span class="badge {% if inv.kind == 'blood' %}bg-danger text-white{% elif inv.kind == 'imaging' %}bg-primary text-white{% elif inv.kind == 'pathology' %}bg-success text-white{% else %}bg-info text-white{% endif %} me-1" style="font-size: 0.68rem;">
+                      {{ inv.kind|capfirst }}
+                    </span>
+                    <strong>{{ inv.type }}</strong>
+                  </td>
+                  <td>
+                    <small class="text-muted">{{ inv.details|truncatechars:100 }}</small>
+                    {% if inv.attachment %}
+                    <a href="{{ inv.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> View</a>
+                    {% endif %}
+                  </td>
+                  <td><small class="fw-semibold">{{ inv.impression }}</small></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center text-muted py-3">No investigations recorded for this case.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: MDT Meeting Discussion & Consensus Documentation -->
+    <div class="col-12 col-xl-6">
+      <div class="card card-clinical h-100">
+        <div class="card-header bg-primary text-white py-1 d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-chat-square-text-fill me-1"></i> Multidisciplinary Team Deliberations & Consensus</strong>
+          <span class="badge bg-light text-dark">Meeting Mode</span>
+        </div>
+        <div class="card-body p-3">
+          
+          <div class="row g-2 mb-2">
+            <div class="col-6 col-md-4">
+              <label class="form-label-compact" for="{{ form.date_mdt_conducted.id_for_label }}">Date Conducted *</label>
+              {{ form.date_mdt_conducted }}
+            </div>
+            <div class="col-6 col-md-8">
+              <label class="form-label-compact">Confirmed / Revised Diagnosis (Cascades to Patient)</label>
+              <input type="text" name="updated_diagnosis" value="{{ clinical.diagnosis|default:patient.diagnosis }}" class="form-control form-control-sm" placeholder="Review or refine diagnosis during MDT" {% if is_approved %}disabled{% endif %}>
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label-compact" for="{{ form.attendees.id_for_label }}">Participating Specialists / MDT Panel</label>
+            {{ form.attendees }}
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label-compact text-primary" for="{{ form.mdt_discussion.id_for_label }}">MDT Discussion & Multi-Specialty Notes *</label>
+            {{ form.mdt_discussion }}
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label-compact text-success fw-bold" for="{{ form.consensus.id_for_label }}">Formal MDT Consensus Recommendation *</label>
+            {{ form.consensus }}
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label-compact text-dark" for="{{ form.followup_actions.id_for_label }}">Action Plan & Follow-Up Responsibilities</label>
+            {{ form.followup_actions }}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Action Bar -->
+  <div class="card card-clinical mt-2">
+    <div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center">
+      <div>
+        <a href="{% url 'patient_search' %}?mr={{ patient.mr_no }}" class="btn btn-outline-secondary btn-sm me-2">
+          <i class="bi bi-arrow-left me-1"></i> Back to Patient
+        </a>
+        <a href="{% url 'report_mdt_full' consensus.consensus_id %}" target="_blank" class="btn btn-outline-dark btn-sm">
+          <i class="bi bi-printer me-1"></i> Print Formal MDT Report
+        </a>
+      </div>
+
+      <div class="d-flex gap-2 mt-2 mt-md-0">
+        {% if not is_approved %}
+          <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary btn-sm px-3 fw-semibold">
+            <i class="bi bi-save me-1"></i> Save Draft
+          </button>
+          <button type="button" class="btn btn-success btn-sm px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalApproveMDT">
+            <i class="bi bi-check2-circle me-1"></i> Finalize & Approve MDT
+          </button>
+        {% else %}
+          <span class="badge badge-approved p-2 d-flex align-items-center">
+            <i class="bi bi-lock-fill me-1"></i> MDT Finalized & Approved by {{ consensus.approved_by }} on {{ consensus.approved_on|date:"d-M-Y H:i" }}
+          </span>
+          <a href="{% url 'report_mdt_full' consensus.consensus_id %}" target="_blank" class="btn btn-success btn-sm px-3 fw-semibold">
+            <i class="bi bi-printer me-1"></i> View & Print Signed Report
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Approve MDT -->
+  {% if not is_approved %}
+  <div class="modal fade" id="modalApproveMDT" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white py-2">
+          <h6 class="modal-title"><i class="bi bi-check-circle me-1"></i> Finalize & Lock MDT Discussion</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-3">
+          <p class="mb-2">Approving this MDT consensus will:</p>
+          <ul class="small mb-3">
+            <li>Finalize the multidisciplinary recommendations for <strong>{{ patient.name }}</strong> (<code>{{ consensus.mdt_id }}</code>).</li>
+            <li>Cascade any updated diagnosis to the master patient file.</li>
+            <li><strong>Permanently lock</strong> this consensus record from casual alterations.</li>
+            <li>Generate the official signed report ready for medical records.</li>
+          </ul>
+          <div class="alert alert-light border small py-2 mb-0">
+            <strong>Signing as:</strong> {{ user.first_name|default:user.username }} ({{ user.profile.role|default:"User" }})
+          </div>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" name="action" value="approve" class="btn btn-success btn-sm px-3 fw-semibold">
+            <i class="bi bi-check-all me-1"></i> Confirm & Finalize MDT
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clinical Summary — {{ patient.name }} ({{ patient.mr_no }})</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 11pt;
+      color: #111;
+      background: #f8fafc;
+      padding: 20px;
+    }
+    .report-sheet {
+      max-width: 850px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 30px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .header-institution {
+      font-size: 14pt;
+      font-weight: 700;
+      color: #1e3a8a;
+      letter-spacing: 0.5px;
+    }
+    .header-sub {
+      font-size: 11pt;
+      font-weight: 600;
+      color: #334155;
+    }
+    .meta-box {
+      border: 1px solid #cbd5e1;
+      background-color: #f8fafc;
+      padding: 8px 12px;
+      font-size: 10pt;
+    }
+    .section-title {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #1e3a8a;
+      border-bottom: 1.5px solid #1e3a8a;
+      padding-bottom: 2px;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    table.table-bordered th, table.table-bordered td {
+      border: 1px solid #cbd5e1 !important;
+      padding: 4px 8px;
+      font-size: 9.5pt;
+    }
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .report-sheet {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="report-sheet">
+  <!-- Command Bar -->
+  <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+    <button onclick="window.history.back()" class="btn btn-outline-secondary btn-sm">
+      &larr; Back
+    </button>
+    <button onclick="window.print()" class="btn btn-primary btn-sm px-3 fw-bold">
+      Print Clinical Summary
+    </button>
+  </div>
+
+  <!-- Formal Hospital Header -->
+  <div class="text-center pb-2 mb-2 border-bottom border-2 border-primary">
+    <div class="header-institution">KIDWAI MEMORIAL INSTITUTE OF ONCOLOGY</div>
+    <div class="header-sub">PAEDIATRIC ONCOLOGY MULTIDISCIPLINARY TEAM — CLINICAL SUMMARY</div>
+  </div>
+
+  <!-- Key Identifiers -->
+  <div class="d-flex justify-content-between small text-muted mb-2">
+    <div>Clinical Episode: <strong>#{{ clinical.clinical_id }}</strong></div>
+    <div>MDT ID: <strong>{{ clinical.mdt_id|default:"Pending Approval" }}</strong></div>
+    <div>Status: <strong class="badge bg-light text-dark border">{{ clinical.status }}</strong></div>
+    <div>Printed: <strong>{{ print_date|date:"d-M-Y H:i" }}</strong></div>
+  </div>
+
+  <!-- Patient Details Card -->
+  <div class="meta-box rounded mb-2">
+    <div class="row g-2">
+      <div class="col-6">
+        <div>Patient Name: <strong class="fs-6 text-primary">{{ patient.name }}</strong></div>
+        <div>MR Number: <strong>{{ patient.mr_no }}</strong></div>
+        <div>Sex: <strong>{{ patient.get_sex_display }}</strong> &bull; DOB: <strong>{{ patient.date_of_birth|date:"d-M-Y" }}</strong></div>
+        <div>Age at Presentation: <strong>{{ patient.format_age }}</strong></div>
+      </div>
+      <div class="col-6">
+        <div>Registered Diagnosis: <strong>{{ patient.diagnosis|default:"—" }}</strong></div>
+        <div>Episode Diagnosis: <strong class="text-danger">{{ clinical.diagnosis|default:"—" }}</strong></div>
+        <div>Stage: <strong>{{ clinical.stage|default:"Not specified" }}</strong></div>
+        <div>Primary Site: <strong>{{ patient.primary_treatment_site|default:"—" }} ({{ patient.laterality|default:"—" }})</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anthropometry & BSA -->
+  <div class="section-title">Anthropometry & Vitals</div>
+  <div class="row g-2 mb-2 small">
+    <div class="col-3">Height: <strong>{{ clinical.height|default:"—" }} cm</strong></div>
+    <div class="col-3">Weight: <strong>{{ clinical.weight|default:"—" }} kg</strong></div>
+    <div class="col-3">Mosteller BSA: <strong class="text-primary">{{ clinical.bsa|default:"—" }} m²</strong></div>
+    <div class="col-3">BMI: <strong>{{ clinical.bmi|default:"—" }} kg/m²</strong></div>
+  </div>
+
+  <!-- Clinical Presentation & History -->
+  <div class="section-title">Clinical Presentation & MDT Intent</div>
+  <div class="small mb-2">
+    <div class="mb-1"><strong>Discussion Purpose:</strong> {{ clinical.discussion_category }}</div>
+    <div class="mb-1"><strong>Specific Questions for Panel:</strong> {{ clinical.mdt_discussion_for|default:"General consensus and treatment sequencing." }}</div>
+    <div class="mb-1"><strong>Presenting Complaints:</strong> {{ clinical.presenting_complaints|default:"None entered." }}</div>
+    <div class="mb-1"><strong>Physical Findings:</strong> {{ clinical.examination_findings|default:"None entered." }}</div>
+    {% if clinical.prev_tx_history %}
+    <div class="mb-1"><strong>Previous Treatment History:</strong> {{ clinical.prev_tx_history }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Investigations -->
+  <div class="section-title">Diagnostic Investigations</div>
+  <table class="table table-bordered mb-2">
+    <thead class="bg-light">
+      <tr>
+        <th style="width: 15%;">Date</th>
+        <th style="width: 25%;">Category & Modality</th>
+        <th style="width: 35%;">Findings / Details</th>
+        <th style="width: 25%;">Impression</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in investigations %}
+      <tr>
+        <td>{{ inv.date|date:"d-M-Y"|default:"—" }}</td>
+        <td><strong>{{ inv.category }}</strong><br><small>{{ inv.type }}</small></td>
+        <td>{{ inv.details }}</td>
+        <td><strong>{{ inv.impression }}</strong></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-center text-muted">No diagnostic investigations recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Signature Section -->
+  <div class="row mt-4 pt-4 small">
+    <div class="col-6">
+      <div>Prepared by: <strong>{{ clinical.entered_by|default:"Medical Officer" }}</strong></div>
+      <div>Date: {{ clinical.entered_on|date:"d-M-Y" }}</div>
+    </div>
+    <div class="col-6 text-end">
+      <div>Consultant In-Charge Signature: ______________________</div>
+      <div>{% if clinical.approved_by %}Approved by: <strong>{{ clinical.approved_by }}</strong> ({{ clinical.approved_on|date:"d-M-Y" }}){% endif %}</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

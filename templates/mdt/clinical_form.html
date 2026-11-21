@@ -1,0 +1,592 @@
+{% extends "base.html" %}
+
+{% block title %}Clinical Presentation #{{ clinical.clinical_id|default:"New" }} — {{ patient.name }}{% endblock %}
+
+{% block content %}
+<!-- Patient Demographics Header Card -->
+<div class="patient-banner shadow-sm py-2 px-3 mb-2">
+  <div class="d-flex flex-wrap justify-content-between align-items-center">
+    <div>
+      <span class="fs-6 fw-bold text-white me-2"><i class="bi bi-person-fill"></i> {{ patient.name }}</span>
+      <span class="badge bg-white text-primary me-2">MR: {{ patient.mr_no }}</span>
+      <span class="badge bg-light text-dark me-2">{{ patient.get_sex_display }}</span>
+      <span class="banner-detail"><i class="bi bi-calendar3 me-1"></i>DOB: <strong>{{ patient.date_of_birth|date:"d-M-Y" }}</strong></span>
+      <span class="banner-detail"><i class="bi bi-hourglass-split me-1"></i>Age: <strong>{{ patient.format_age }}</strong></span>
+      <span class="banner-detail"><i class="bi bi-bandaid me-1"></i>Reg Diag: <strong>{{ patient.diagnosis|default:"—" }}</strong></span>
+    </div>
+    <div class="mt-1 mt-md-0 d-flex align-items-center gap-2">
+      <span class="badge {% if clinical.status == 'Approved' %}bg-success text-white{% else %}bg-warning text-dark{% endif %} p-1 px-2" style="font-size: 0.76rem;">
+        Status: {{ clinical.status|default:"Draft" }}
+      </span>
+      {% if clinical.mdt_id %}
+      <span class="badge bg-light text-primary border p-1 px-2 fw-bold" style="font-size: 0.76rem;">
+        MDT ID: {{ clinical.mdt_id }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<form method="post" id="clinicalForm">
+  {% csrf_token %}
+  
+  <div class="row g-2">
+    <!-- Left Column: Clinical Presentation Inputs -->
+    <div class="col-12 col-xl-7">
+      <div class="card card-clinical h-100">
+        <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-file-earmark-medical text-primary me-1"></i> Clinical Presentation & History</strong>
+          <span class="small text-muted">Episode #{{ clinical.clinical_id|default:"New" }}</span>
+        </div>
+        <div class="card-body p-2">
+          
+          <!-- Diagnosis, Stage, Category -->
+          <div class="row g-2 mb-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label-compact" for="{{ form.diagnosis.id_for_label }}">Current Episode Diagnosis *</label>
+              {{ form.diagnosis }}
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label-compact" for="{{ form.stage.id_for_label }}">Clinical Stage</label>
+              {{ form.stage }}
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label-compact" for="{{ form.date_mdt_planned.id_for_label }}">Planned MDT Date</label>
+              {{ form.date_mdt_planned }}
+            </div>
+          </div>
+
+          <!-- Paediatric Vitals & Auto BSA / BMI Bar -->
+          <div class="p-2 mb-2 rounded bg-light border">
+            <div class="row g-2 align-items-center">
+              <div class="col-6 col-sm-3">
+                <label class="form-label-compact" for="{{ form.height.id_for_label }}">Height (cm)</label>
+                {{ form.height }}
+              </div>
+              <div class="col-6 col-sm-3">
+                <label class="form-label-compact" for="{{ form.weight.id_for_label }}">Weight (kg)</label>
+                {{ form.weight }}
+              </div>
+              <div class="col-6 col-sm-3">
+                <div class="form-label-compact text-primary fw-bold">Body Surface Area (BSA)</div>
+                <div class="badge bg-primary text-white p-2 d-block text-center fs-6" id="calc_bsa">
+                  {% if clinical.bsa %}{{ clinical.bsa }} m²{% else %}—{% endif %}
+                </div>
+              </div>
+              <div class="col-6 col-sm-3">
+                <div class="form-label-compact text-secondary fw-bold">Body Mass Index (BMI)</div>
+                <div class="badge bg-secondary text-white p-2 d-block text-center fs-6" id="calc_bmi">
+                  {% if clinical.bmi %}{{ clinical.bmi }} kg/m²{% else %}—{% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Discussion Purpose & Previous Tx -->
+          <div class="row g-2 mb-2">
+            <div class="col-12 col-md-5">
+              <label class="form-label-compact" for="{{ form.discussion_category.id_for_label }}">MDT Discussion Purpose</label>
+              {{ form.discussion_category }}
+            </div>
+            <div class="col-12 col-md-7">
+              <label class="form-label-compact" for="{{ form.prev_tx_history.id_for_label }}">Previous Treatment History</label>
+              {{ form.prev_tx_history }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact" for="{{ form.mdt_discussion_for.id_for_label }}">Specific Clinical Questions for MDT Panel</label>
+              {{ form.mdt_discussion_for }}
+            </div>
+          </div>
+
+          <!-- History & Physical Examination -->
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label-compact" for="{{ form.presenting_complaints.id_for_label }}">Presenting Complaints & History</label>
+              {{ form.presenting_complaints }}
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label-compact" for="{{ form.examination_findings.id_for_label }}">Physical & Systemic Findings</label>
+              {{ form.examination_findings }}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Multi-Modality Diagnostic Investigations -->
+    <div class="col-12 col-xl-5">
+      <div class="card card-clinical h-100">
+        <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-diagram-3 text-primary me-1"></i> Diagnostic Investigations</strong>
+          <small class="text-muted">4 Categories</small>
+        </div>
+        <div class="card-body p-2">
+          
+          {% if is_new %}
+          <div class="alert alert-info py-2 px-3 small">
+            <i class="bi bi-info-circle me-1"></i> Save this clinical presentation draft first before attaching investigations.
+          </div>
+          {% else %}
+          <!-- Investigation Category Tabs -->
+          <ul class="nav nav-tabs nav-tabs-clinical" id="invTabs" role="tablist">
+            <li class="nav-item">
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabBlood" type="button">
+                Blood / Chem ({{ blood_tests|length }})
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabImaging" type="button">
+                Imaging ({{ imaging_tests|length }})
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPathology" type="button">
+                Pathology ({{ pathology_tests|length }})
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMolecular" type="button">
+                Molecular ({{ molecular_tests|length }})
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content" id="invTabContent">
+            <!-- 1. Blood / Biochemistry -->
+            <div class="tab-pane fade show active" id="tabBlood" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-semibold text-muted">Hematology, LFT, KFT, Fluids</span>
+                {% if not is_approved %}
+                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalBlood">
+                  <i class="bi bi-plus-lg me-1"></i> Add Blood
+                </button>
+                {% endif %}
+              </div>
+              <div class="table-responsive" style="max-height: 220px;">
+                <table class="table table-compact table-bordered mb-0">
+                  <thead class="bg-light">
+                    <tr><th>Date</th><th>Specimen</th><th>Impression / Findings</th><th class="text-end">#</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for b in blood_tests %}
+                    <tr>
+                      <td class="text-nowrap">{{ b.test_date|date:"d-M-y" }}</td>
+                      <td><strong>{{ b.specimen_type.name }}</strong></td>
+                      <td>
+                        <small>{{ b.impression|default:b.details }}</small>
+                        {% if b.attachment %}
+                        <a href="{{ b.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> File</a>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if not is_approved %}
+                        <a href="{% url 'investigation_delete' 'blood' b.id %}" class="text-danger small" onclick="return confirm('Delete this test?');"><i class="bi bi-trash"></i></a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-muted py-2 small">No blood tests recorded.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 2. Imaging -->
+            <div class="tab-pane fade" id="tabImaging" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-semibold text-muted">CT, MRI, PET, USG, Scans</span>
+                {% if not is_approved %}
+                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalImaging">
+                  <i class="bi bi-plus-lg me-1"></i> Add Imaging
+                </button>
+                {% endif %}
+              </div>
+              <div class="table-responsive" style="max-height: 220px;">
+                <table class="table table-compact table-bordered mb-0">
+                  <thead class="bg-light">
+                    <tr><th>Date</th><th>Modality & Site</th><th>Impression</th><th class="text-end">#</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for i in imaging_tests %}
+                    <tr>
+                      <td class="text-nowrap">{{ i.imaging_date|date:"d-M-y" }}</td>
+                      <td><strong>{{ i.imaging_type.name }}</strong> &bull; {{ i.site.name }}</td>
+                      <td>
+                        <small>{{ i.impression|default:i.details }}</small>
+                        {% if i.attachment %}
+                        <a href="{{ i.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> Image</a>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if not is_approved %}
+                        <a href="{% url 'investigation_delete' 'imaging' i.id %}" class="text-danger small" onclick="return confirm('Delete this scan?');"><i class="bi bi-trash"></i></a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-muted py-2 small">No imaging recorded.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 3. Pathology -->
+            <div class="tab-pane fade" id="tabPathology" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-semibold text-muted">Histopathology, IHC, Biopsies</span>
+                {% if not is_approved %}
+                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalPathology">
+                  <i class="bi bi-plus-lg me-1"></i> Add Pathology
+                </button>
+                {% endif %}
+              </div>
+              <div class="table-responsive" style="max-height: 220px;">
+                <table class="table table-compact table-bordered mb-0">
+                  <thead class="bg-light">
+                    <tr><th>Date</th><th>Type / Ref</th><th>Diagnosis / Impression</th><th class="text-end">#</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for p in pathology_tests %}
+                    <tr>
+                      <td class="text-nowrap">{{ p.path_date|date:"d-M-y" }}</td>
+                      <td>
+                        <strong>{{ p.specimen_type.name }}</strong>
+                        {% if p.lab_reference_no %}<div class="text-muted" style="font-size: 0.72rem;">Ref: {{ p.lab_reference_no }}</div>{% endif %}
+                      </td>
+                      <td>
+                        <small>{{ p.impression|default:p.details }}</small>
+                        {% if p.attachment %}
+                        <a href="{{ p.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> Report</a>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if not is_approved %}
+                        <a href="{% url 'investigation_delete' 'pathology' p.id %}" class="text-danger small" onclick="return confirm('Delete this report?');"><i class="bi bi-trash"></i></a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-muted py-2 small">No pathology recorded.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 4. Molecular -->
+            <div class="tab-pane fade" id="tabMolecular" role="tabpanel">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small fw-semibold text-muted">FISH, NGS, Cytogenetics</span>
+                {% if not is_approved %}
+                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalMolecular">
+                  <i class="bi bi-plus-lg me-1"></i> Add Molecular
+                </button>
+                {% endif %}
+              </div>
+              <div class="table-responsive" style="max-height: 220px;">
+                <table class="table table-compact table-bordered mb-0">
+                  <thead class="bg-light">
+                    <tr><th>Date</th><th>Panel / Test</th><th>Genomic Aberrations</th><th class="text-end">#</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for m in molecular_tests %}
+                    <tr>
+                      <td class="text-nowrap">{{ m.test_date|date:"d-M-y" }}</td>
+                      <td><strong>{{ m.test_type.name }}</strong></td>
+                      <td>
+                        <small>{{ m.impression|default:m.details }}</small>
+                        {% if m.attachment %}
+                        <a href="{{ m.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> Panel</a>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if not is_approved %}
+                        <a href="{% url 'investigation_delete' 'molecular' m.id %}" class="text-danger small" onclick="return confirm('Delete this test?');"><i class="bi bi-trash"></i></a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center text-muted py-2 small">No molecular tests recorded.</td></tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Command Bar -->
+  <div class="card card-clinical mt-2">
+    <div class="card-body py-2 px-3 d-flex flex-wrap justify-content-between align-items-center">
+      <div>
+        <a href="{% url 'patient_search' %}?mr={{ patient.mr_no }}" class="btn btn-outline-secondary btn-sm me-2">
+          <i class="bi bi-arrow-left me-1"></i> Back to Patient
+        </a>
+        {% if clinical.clinical_id %}
+        <a href="{% url 'report_clinical_summary' clinical.clinical_id %}" target="_blank" class="btn btn-outline-dark btn-sm">
+          <i class="bi bi-printer me-1"></i> Print Clinical Summary
+        </a>
+        {% endif %}
+      </div>
+      
+      <div class="d-flex gap-2 mt-2 mt-md-0">
+        {% if not is_approved %}
+          <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary btn-sm px-3 fw-semibold">
+            <i class="bi bi-save me-1"></i> Save Draft
+          </button>
+          
+          {% if not is_new %}
+          <button type="button" class="btn btn-success btn-sm px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalConfirmApproval">
+            <i class="bi bi-check2-circle me-1"></i> Approve Clinical Details
+          </button>
+          {% endif %}
+        {% else %}
+          <span class="badge badge-approved p-2 d-flex align-items-center">
+            <i class="bi bi-lock-fill me-1"></i> Record Approved by {{ clinical.approved_by }} on {{ clinical.approved_on|date:"d-M-Y H:i" }}
+          </span>
+          {% if clinical.consensus %}
+          <a href="{% url 'consensus_edit' clinical.consensus.consensus_id %}" class="btn btn-primary btn-sm px-3 fw-semibold">
+            <i class="bi bi-chat-square-text me-1"></i> Proceed to MDT Discussion
+          </a>
+          <a href="{% url 'live_presentation' clinical.consensus.consensus_id %}" class="btn btn-info btn-sm px-3 fw-semibold text-white">
+            <i class="bi bi-tv me-1"></i> Live Screen Mode
+          </a>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirm Approval -->
+  {% if not is_approved and not is_new %}
+  <div class="modal fade" id="modalConfirmApproval" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white py-2">
+          <h6 class="modal-title"><i class="bi bi-shield-check me-1"></i> Confirm Clinical Approval</h6>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-3">
+          <p class="mb-2">Approving this clinical case will:</p>
+          <ul class="small mb-3">
+            <li>Generate an official sequential <strong>MDT ID</strong> (e.g. <code>PED{{ today.year }}00xxxxx</code>).</li>
+            <li>Create the official <strong>MDT Consensus stub</strong> for multidisciplinary meeting review.</li>
+            <li><strong>Lock this clinical presentation</strong> from further edits.</li>
+            <li>Synchronize the latest diagnosis to patient master record.</li>
+          </ul>
+          <div class="alert alert-light border small py-2 mb-0">
+            <strong>Approving as:</strong> {{ user.first_name|default:user.username }} ({{ user.profile.role|default:"User" }})
+          </div>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" name="action" value="approve" class="btn btn-success btn-sm px-3 fw-semibold">
+            <i class="bi bi-check2-circle me-1"></i> Yes, Approve & Generate MDT ID
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</form>
+
+<!-- Investigation Add Modals (Only rendered when record exists & not approved) -->
+{% if not is_new and not is_approved %}
+<!-- Modal: Add Blood -->
+<div class="modal fade" id="modalBlood" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'investigation_add' clinical.clinical_id 'blood' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header bg-light py-2">
+          <h6 class="modal-title"><i class="bi bi-droplet text-danger me-1"></i> Add Blood / Fluid Investigation</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label-compact">Test Date *</label>
+              {{ blood_form.test_date }}
+            </div>
+            <div class="col-6">
+              <label class="form-label-compact">Specimen Type *</label>
+              {{ blood_form.specimen_type }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Details / Findings *</label>
+              {{ blood_form.details }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Impression</label>
+              {{ blood_form.impression }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Report Attachment (PDF/Image)</label>
+              {{ blood_form.attachment }}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Blood Test</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Imaging -->
+<div class="modal fade" id="modalImaging" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'investigation_add' clinical.clinical_id 'imaging' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header bg-light py-2">
+          <h6 class="modal-title"><i class="bi bi-camera text-primary me-1"></i> Add Imaging / Radiology</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          <div class="row g-2">
+            <div class="col-4">
+              <label class="form-label-compact">Imaging Date *</label>
+              {{ imaging_form.imaging_date }}
+            </div>
+            <div class="col-4">
+              <label class="form-label-compact">Modality *</label>
+              {{ imaging_form.imaging_type }}
+            </div>
+            <div class="col-4">
+              <label class="form-label-compact">Anatomical Site *</label>
+              {{ imaging_form.site }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Radiology Findings *</label>
+              {{ imaging_form.details }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Impression</label>
+              {{ imaging_form.impression }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Scan Image / Report Attachment</label>
+              {{ imaging_form.attachment }}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Imaging</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Pathology -->
+<div class="modal fade" id="modalPathology" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'investigation_add' clinical.clinical_id 'pathology' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header bg-light py-2">
+          <h6 class="modal-title"><i class="bi bi-eyedropper text-success me-1"></i> Add Pathology / Biopsy</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          <div class="row g-2">
+            <div class="col-4">
+              <label class="form-label-compact">Report Date *</label>
+              {{ path_form.path_date }}
+            </div>
+            <div class="col-4">
+              <label class="form-label-compact">Specimen Type *</label>
+              {{ path_form.specimen_type }}
+            </div>
+            <div class="col-4">
+              <label class="form-label-compact">Lab Ref No</label>
+              {{ path_form.lab_reference_no }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Site of Biopsy</label>
+              {{ path_form.site_of_biopsy }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Microscopic & Gross Findings *</label>
+              {{ path_form.details }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Pathology Impression</label>
+              {{ path_form.impression }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Pathology Report File</label>
+              {{ path_form.attachment }}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Pathology</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Molecular -->
+<div class="modal fade" id="modalMolecular" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'investigation_add' clinical.clinical_id 'molecular' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header bg-light py-2">
+          <h6 class="modal-title"><i class="bi bi-dna text-info me-1"></i> Add Molecular / Genetic Test</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-3">
+          <div class="row g-2">
+            <div class="col-4">
+              <label class="form-label-compact">Test Date *</label>
+              {{ mol_form.test_date }}
+            </div>
+            <div class="col-4">
+              <label class="form-label-compact">Molecular Type *</label>
+              {{ mol_form.test_type }}
+            </div>
+            <div class="col-4">
+              <label class="form-label-compact">Lab Ref No</label>
+              {{ mol_form.lab_reference_no }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Genomic / Molecular Findings *</label>
+              {{ mol_form.details }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Molecular Interpretation</label>
+              {{ mol_form.impression }}
+            </div>
+            <div class="col-12">
+              <label class="form-label-compact">Molecular Report File</label>
+              {{ mol_form.attachment }}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Molecular</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
