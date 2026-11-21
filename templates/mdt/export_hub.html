@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Data Export Hub — Pead MDT{% endblock %}
+
+{% block content %}
+<div class="card card-clinical shadow-sm mb-3">
+  
+  <!-- Header -->
+  <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center py-2 px-3">
+    <div class="d-flex align-items-center">
+      <i class="bi bi-file-earmark-spreadsheet-fill text-success fs-5 me-2"></i>
+      <div>
+        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">Clinical Data Export Hub & Research Archives</h6>
+        <div class="text-muted" style="font-size: 0.75rem;">Download structured clinical data and research tables in Excel-compatible UTF-8 CSV or ZIP archives.</div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 mt-2 mt-sm-0">
+      <a href="{% url 'export_all_zip' %}" class="btn btn-success btn-sm py-1 px-3 fw-bold shadow-sm" style="font-size: 0.82rem;">
+        <i class="bi bi-file-zip-fill me-1"></i> Download All Datasets (ZIP)
+      </a>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="card-body p-3">
+    
+    <!-- Live Dataset Stats Row -->
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-2">
+        <div class="p-2 border rounded text-center bg-light">
+          <div class="text-secondary small" style="font-size: 0.72rem;">PATIENTS</div>
+          <div class="fs-5 fw-bold text-primary">{{ patient_count }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="p-2 border rounded text-center bg-light">
+          <div class="text-secondary small" style="font-size: 0.72rem;">MDT EPISODES</div>
+          <div class="fs-5 fw-bold text-info">{{ clinical_count }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="p-2 border rounded text-center bg-light">
+          <div class="text-secondary small" style="font-size: 0.72rem;">CONSENSUSES</div>
+          <div class="fs-5 fw-bold text-success">{{ consensus_count }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="p-2 border rounded text-center bg-light">
+          <div class="text-secondary small" style="font-size: 0.72rem;">INVESTIGATIONS</div>
+          <div class="fs-5 fw-bold text-warning-emphasis">{{ inv_count }}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="p-2 border rounded text-center bg-light">
+          <div class="text-secondary small" style="font-size: 0.72rem;">AUDIT LOGS</div>
+          <div class="fs-5 fw-bold text-secondary">{{ audit_count }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Dataset Cards Grid -->
+    <div class="row g-3">
+      
+      <!-- Card 1: Patients Demographics -->
+      <div class="col-md-6">
+        <div class="card h-100 border shadow-sm" style="background-color: #faf8f5;">
+          <div class="card-body p-3 d-flex flex-column">
+            <div class="d-flex align-items-center mb-2">
+              <span class="badge bg-primary-subtle text-primary border p-2 me-2">
+                <i class="bi bi-people fs-5"></i>
+              </span>
+              <div>
+                <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.9rem;">Patient Master Demographics Register</h6>
+                <small class="text-muted" style="font-size: 0.75rem;">MR No, Names, Age, Diagnosis, Sites, Geography & Contacts</small>
+              </div>
+            </div>
+            <p class="text-secondary small mb-3 flex-grow-1" style="font-size: 0.78rem;">
+              Comprehensive export of all registered pediatric patients. Contains MR numbers, calculated pediatric ages, primary tumor diagnoses, treatment sites, laterality, parents/guardians, telephone contacts, and state/district distributions.
+            </p>
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="text-muted small" style="font-size: 0.75rem;"><strong>{{ patient_count }}</strong> records</span>
+              <a href="{% url 'export_patients_csv' %}" class="btn btn-outline-primary btn-sm py-1 px-3 fw-semibold" style="font-size: 0.8rem;">
+                <i class="bi bi-download me-1"></i> Export Patients (.CSV)
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: MDT Clinical Presentations & Consensus -->
+      <div class="col-md-6">
+        <div class="card h-100 border shadow-sm" style="background-color: #faf8f5;">
+          <div class="card-body p-3 d-flex flex-column">
+            <div class="d-flex align-items-center mb-2">
+              <span class="badge bg-success-subtle text-success border p-2 me-2">
+                <i class="bi bi-clipboard2-check fs-5"></i>
+              </span>
+              <div>
+                <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.9rem;">MDT Clinical Presentations & Consensus Outcomes</h6>
+                <small class="text-muted" style="font-size: 0.75rem;">Episodes, BSA, BMI, Deliberations, Consensus, Follow-up</small>
+              </div>
+            </div>
+            <p class="text-secondary small mb-3 flex-grow-1" style="font-size: 0.78rem;">
+              Full dataset of pediatric MDT presentation episodes. Includes sequential MDT IDs, presentation dates, vitals, BSA (Mosteller), BMI, disease staging, clinical questions, attendees, panel discussion transcripts, and agreed multidisciplinary consensus decisions.
+            </p>
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="text-muted small" style="font-size: 0.75rem;"><strong>{{ clinical_count }}</strong> episodes</span>
+              <a href="{% url 'export_mdt_csv' %}" class="btn btn-outline-success btn-sm py-1 px-3 fw-semibold" style="font-size: 0.8rem;">
+                <i class="bi bi-download me-1"></i> Export MDT Data (.CSV)
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Diagnostic Investigations -->
+      <div class="col-md-6">
+        <div class="card h-100 border shadow-sm" style="background-color: #faf8f5;">
+          <div class="card-body p-3 d-flex flex-column">
+            <div class="d-flex align-items-center mb-2">
+              <span class="badge bg-warning-subtle text-dark border p-2 me-2">
+                <i class="bi bi-diagram-3 fs-5 text-warning-emphasis"></i>
+              </span>
+              <div>
+                <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.9rem;">Multi-Modality Diagnostic Investigations</h6>
+                <small class="text-muted" style="font-size: 0.75rem;">Blood, CT/MRI/PET, Histopathology, Genomic Alterations</small>
+              </div>
+            </div>
+            <p class="text-secondary small mb-3 flex-grow-1" style="font-size: 0.78rem;">
+              Unified consolidated extract across all diagnostic streams: hematology/biochemistry labs, imaging modalities (CT, MRI, PET, Bone Scan), pathology specimen IHC markers, and molecular/NGS translocations linked to each MDT episode.
+            </p>
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="text-muted small" style="font-size: 0.75rem;"><strong>{{ inv_count }}</strong> investigations</span>
+              <a href="{% url 'export_investigations_csv' %}" class="btn btn-outline-warning text-dark btn-sm py-1 px-3 fw-semibold" style="font-size: 0.8rem;">
+                <i class="bi bi-download me-1"></i> Export Investigations (.CSV)
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Audit Trail -->
+      <div class="col-md-6">
+        <div class="card h-100 border shadow-sm" style="background-color: #faf8f5;">
+          <div class="card-body p-3 d-flex flex-column">
+            <div class="d-flex align-items-center mb-2">
+              <span class="badge bg-secondary-subtle text-secondary border p-2 me-2">
+                <i class="bi bi-shield-check fs-5"></i>
+              </span>
+              <div>
+                <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.9rem;">Security & Clinical Governance Audit Trail</h6>
+                <small class="text-muted" style="font-size: 0.75rem;">Timestamps, User Actions, Table Mutations, Record References</small>
+              </div>
+            </div>
+            <p class="text-secondary small mb-3 flex-grow-1" style="font-size: 0.78rem;">
+              Full chronological log of clinical activities and system administration: user logins, approvals, patient creation/updates, consensus finalization, and record deletions for institutional compliance.
+            </p>
+            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+              <span class="text-muted small" style="font-size: 0.75rem;"><strong>{{ audit_count }}</strong> log entries</span>
+              <a href="{% url 'export_audit_logs_csv' %}" class="btn btn-outline-secondary btn-sm py-1 px-3 fw-semibold" style="font-size: 0.8rem;">
+                <i class="bi bi-download me-1"></i> Export Audit Logs (.CSV)
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Excel Compatibility Information Banner -->
+    <div class="alert alert-light border mt-3 mb-0 py-2 px-3 small d-flex align-items-center">
+      <i class="bi bi-info-circle-fill text-primary me-2 fs-6"></i>
+      <span class="text-secondary" style="font-size: 0.75rem;">
+        <strong>Excel Compatibility Note:</strong> All generated CSV files are encoded with UTF-8 BOM (Byte Order Mark), allowing direct double-click opening in Microsoft Excel on Windows without character encoding or column delimiter issues.
+      </span>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

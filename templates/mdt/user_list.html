@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}User Management — Pead MDT{% endblock %}
+
+{% block content %}
+<div class="card card-clinical shadow-sm mb-3">
+  <!-- Card Header -->
+  <div class="card-header bg-light d-flex flex-wrap justify-content-between align-items-center py-2 px-3">
+    <div class="d-flex align-items-center">
+      <i class="bi bi-people-fill text-primary fs-5 me-2"></i>
+      <div>
+        <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">User Account Management</h6>
+        <div class="text-muted" style="font-size: 0.75rem;">Manage team logins, medical prefixes, role permissions, and active status.</div>
+      </div>
+    </div>
+    <div class="d-flex align-items-center gap-2 mt-2 mt-sm-0">
+      <a href="{% url 'export_hub' %}" class="btn btn-outline-secondary btn-sm py-1 px-2" style="font-size: 0.8rem;">
+        <i class="bi bi-download me-1"></i> Export Hub
+      </a>
+      <a href="{% url 'user_create' %}" class="btn btn-primary btn-sm py-1 px-3 fw-semibold shadow-sm" style="font-size: 0.82rem;">
+        <i class="bi bi-person-plus me-1"></i> Add New User
+      </a>
+    </div>
+  </div>
+
+  <div class="card-body p-3">
+    <!-- Compact Filter Bar -->
+    <form method="GET" action="{% url 'user_list' %}" class="row g-2 align-items-center mb-3 p-2 rounded bg-light border">
+      <div class="col-auto">
+        <label class="col-form-label col-form-label-sm fw-semibold text-secondary py-0" style="font-size: 0.78rem;">Search:</label>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <input type="text" name="q" value="{{ query }}" placeholder="Username or doctor name..." class="form-control form-control-sm">
+      </div>
+
+      <div class="col-auto">
+        <label class="col-form-label col-form-label-sm fw-semibold text-secondary py-0" style="font-size: 0.78rem;">Role:</label>
+      </div>
+      <div class="col-md-2 col-sm-4">
+        <select name="role" class="form-select form-select-sm">
+          <option value="">-- All Roles --</option>
+          {% for r_val, r_label in roles %}
+            <option value="{{ r_val }}" {% if selected_role == r_val %}selected{% endif %}>{{ r_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-auto">
+        <label class="col-form-label col-form-label-sm fw-semibold text-secondary py-0" style="font-size: 0.78rem;">Status:</label>
+      </div>
+      <div class="col-md-2 col-sm-4">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">-- All Status --</option>
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive Only</option>
+        </select>
+      </div>
+
+      <div class="col-auto d-flex gap-1">
+        <button type="submit" class="btn btn-primary btn-sm py-1 px-2" style="font-size: 0.78rem;">
+          <i class="bi bi-filter me-1"></i> Filter
+        </button>
+        {% if query or selected_role or status_filter %}
+        <a href="{% url 'user_list' %}" class="btn btn-outline-secondary btn-sm py-1 px-2" style="font-size: 0.78rem;">
+          Reset
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="col text-end d-none d-md-block">
+        <span class="badge bg-secondary-subtle text-secondary border px-2 py-1" style="font-size: 0.75rem;">
+          Total: <strong>{{ total_count }}</strong> (Active: {{ active_count }}, Inactive: {{ inactive_count }})
+        </span>
+      </div>
+    </form>
+
+    <!-- Users Table -->
+    <div class="table-responsive">
+      <table class="table table-compact table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr style="font-size: 0.78rem;">
+            <th style="width: 40px; text-align: center;">#</th>
+            <th>Username</th>
+            <th>Prefix & Doctor / Staff Name</th>
+            <th>Role</th>
+            <th>User Level</th>
+            <th style="text-align: center;">Status</th>
+            <th style="text-align: right; width: 180px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody style="font-size: 0.82rem;">
+          {% for u in users %}
+          <tr {% if not u.is_active %}class="table-light text-muted" style="opacity: 0.75;"{% endif %}>
+            <td style="text-align: center; color: #777;">{{ forloop.counter }}</td>
+            <td>
+              <code class="fw-bold text-dark">{{ u.username }}</code>
+              {% if u.id == request.user.id %}
+                <span class="badge bg-info-subtle text-info border ms-1" style="font-size: 0.68rem;">You</span>
+              {% endif %}
+            </td>
+            <td class="fw-semibold">
+              {% if u.profile.prefix %}
+                <span class="text-primary fw-bold">{{ u.profile.prefix }}</span>
+              {% endif %}
+              {{ u.profile.full_name|default:u.first_name|default:"—" }}
+              {% if u.email %}
+                <div class="text-muted small fw-normal" style="font-size: 0.72rem;">{{ u.email }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.profile.role == 'Admin' %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2">Admin</span>
+              {% elif u.profile.role == 'SubAdmin' %}
+                <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-2">SubAdmin</span>
+              {% elif u.profile.role == 'Consultant' %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2">Consultant</span>
+              {% elif u.profile.role == 'Resident' %}
+                <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2">Resident</span>
+              {% else %}
+                <span class="badge bg-light text-dark border px-2">{{ u.profile.role|default:"User" }}</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.72rem;">
+                {{ u.profile.user_level|default:"USER" }}
+              </span>
+            </td>
+            <td style="text-align: center;">
+              {% if u.is_active %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2" style="font-size: 0.72rem;">
+                  <i class="bi bi-check-circle-fill me-1"></i> Active
+                </span>
+              {% else %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2" style="font-size: 0.72rem;">
+                  <i class="bi bi-x-circle-fill me-1"></i> Inactive
+                </span>
+              {% endif %}
+            </td>
+            <td style="text-align: right;" class="text-nowrap">
+              <a href="{% url 'user_edit' u.id %}" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.78rem;" title="Edit User">
+                <i class="bi bi-pencil-square me-1"></i> Edit
+              </a>
+              {% if is_admin and u.id != request.user.id %}
+                <a href="{% url 'user_toggle_active' u.id %}" 
+                   class="btn btn-sm py-0 px-2 {% if u.is_active %}btn-outline-warning text-dark{% else %}btn-outline-success{% endif %}" 
+                   style="font-size: 0.78rem;" 
+                   title="{% if u.is_active %}Deactivate Account{% else %}Activate Account{% endif %}"
+                   onclick="return confirm('Toggle active status for user {{ u.username }}?');">
+                  {% if u.is_active %}<i class="bi bi-pause-circle"></i>{% else %}<i class="bi bi-play-circle"></i>{% endif %}
+                </a>
+                <a href="{% url 'user_delete' u.id %}" class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size: 0.78rem;" title="Permanently Delete User">
+                  <i class="bi bi-trash3"></i>
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-person-x fs-3 d-block mb-1"></i>
+              No user accounts found matching current search/filter.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

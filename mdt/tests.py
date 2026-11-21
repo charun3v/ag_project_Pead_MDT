@@ -171,3 +171,187 @@ class PeadMDTTests(TestCase):
         self.assertEqual(resp_mdt.status_code, 200)
         self.assertContains(resp_mdt, 'PED20260000099')
         self.assertContains(resp_mdt, 'Proceed with 3 cycles induction chemo')
+
+    def test_user_management_by_admin(self):
+        admin_client = Client()
+        admin_client.login(username='adminuser', password='password123')
+
+        # 1. Access user list
+        resp = admin_client.get(reverse('user_list'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'User Account Management')
+        self.assertContains(resp, 'adminuser')
+
+        # 2. Non-admin access should be denied / redirected
+        non_admin_client = Client()
+        non_admin_client.login(username='drtest', password='password123')
+        resp_denied = non_admin_client.get(reverse('user_list'))
+        self.assertEqual(resp_denied.status_code, 302)
+
+        # 3. Create new user
+        resp_create = admin_client.post(reverse('user_create'), {
+            'username': 'newfellow',
+            'prefix': 'Dr.',
+            'first_name': 'Fellow Oncologist',
+            'email': 'fellow@hospital.org',
+            'password': 'SafePassword123!',
+            'role': 'Resident'
+        })
+        self.assertEqual(resp_create.status_code, 302)
+
+        created_user = User.objects.filter(username='newfellow').first()
+        self.assertIsNotNone(created_user)
+        self.assertEqual(created_user.profile.prefix, 'Dr.')
+        self.assertEqual(created_user.profile.role, 'Resident')
+        self.assertEqual(created_user.profile.full_name, 'Fellow Oncologist')
+
+        # Check audit log for user creation
+        log = AuditLog.objects.filter(action='USER_CREATE', record_ref='newfellow').first()
+        self.assertIsNotNone(log)
+
+        # 4. Edit user
+        resp_edit = admin_client.post(reverse('user_edit', args=[created_user.id]), {
+            'prefix': 'Dr.',
+            'first_name': 'Senior Fellow',
+            'email': 'fellow@hospital.org',
+            'role': 'Consultant',
+            'password': '',
+            'is_active': 'on'
+        })
+        self.assertEqual(resp_edit.status_code, 302)
+        created_user.refresh_from_db()
+        self.assertEqual(created_user.profile.role, 'Consultant')
+        self.assertEqual(created_user.profile.full_name, 'Senior Fellow')
+
+        # 5. Toggle active
+        resp_toggle = admin_client.get(reverse('user_toggle_active', args=[created_user.id]))
+        self.assertEqual(resp_toggle.status_code, 302)
+        created_user.refresh_from_db()
+        self.assertFalse(created_user.is_active)
+
+        # 6. Delete user
+        resp_del = admin_client.post(reverse('user_delete', args=[created_user.id]), {
+            'confirm_delete': 'on'
+        })
+        self.assertEqual(resp_del.status_code, 302)
+        self.assertFalse(User.objects.filter(username='newfellow').exists())
+
+    def test_admin_deletion_patient_and_cascades(self):
+        admin_client = Client()
+        admin_client.login(username='adminuser', password='password123')
+
+        # Create patient with clinical presentation and blood test
+        del_patient = Patient.objects.create(
+            mr_no='MR_DEL_001',
+            name='Temporary Patient For Delete',
+            sex='M',
+            date_of_birth=date.today() - timedelta(days=365*3),
+            diagnosis='Wilms Tumor',
+            entered_by='adminuser'
+        )
+        clin = ClinicalDetails.objects.create(
+            patient=del_patient,
+            diagnosis='Wilms Tumor Stage 1',
+            status='Approved',
+            mdt_id='PED20260000055'
+        )
+        MDTConsensus.objects.create(
+            clinical_details=clin,
+            mdt_id='PED20260000055',
+            status='Approved',
+            consensus='Upfront Nephrectomy'
+        )
+        BloodInvestigation.objects.create(
+            clinical_details=clin,
+            test_date=date.today(),
+            specimen_type=self.blood_specimen,
+            details='CBC normal'
+        )
+
+        # GET confirm delete page
+        resp_confirm = admin_client.get(reverse('patient_delete', args=[del_patient.mr_no]))
+        self.assertEqual(resp_confirm.status_code, 200)
+        self.assertContains(resp_confirm, 'Temporary Patient For Delete')
+        self.assertContains(resp_confirm, 'Wilms Tumor')
+
+        # POST without checkbox should fail
+        resp_fail = admin_client.post(reverse('patient_delete', args=[del_patient.mr_no]), {})
+        self.assertEqual(resp_fail.status_code, 200)
+        self.assertTrue(Patient.objects.filter(mr_no='MR_DEL_001').exists())
+
+        # POST with confirmation checkbox deletes patient and cascades
+        resp_success = admin_client.post(reverse('patient_delete', args=[del_patient.mr_no]), {
+            'confirm_delete': 'on'
+        })
+        self.assertEqual(resp_success.status_code, 302)
+        self.assertFalse(Patient.objects.filter(mr_no='MR_DEL_001').exists())
+        self.assertFalse(ClinicalDetails.objects.filter(patient__mr_no='MR_DEL_001').exists())
+        self.assertFalse(MDTConsensus.objects.filter(mdt_id='PED20260000055').exists())
+
+        # Check deletion logged in audit trail
+        log = AuditLog.objects.filter(action='DELETE_PATIENT', record_ref='MR_DEL_001').first()
+        self.assertIsNotNone(log)
+
+    def test_admin_deletion_clinical_presentation(self):
+        admin_client = Client()
+        admin_client.login(username='adminuser', password='password123')
+
+        clin = ClinicalDetails.objects.create(
+            patient=self.patient,
+            diagnosis='Neuroblastoma',
+            status='Draft'
+        )
+        MDTConsensus.objects.create(
+            clinical_details=clin,
+            consensus='Draft consensus'
+        )
+
+        resp_get = admin_client.get(reverse('clinical_delete', args=[clin.clinical_id]))
+        self.assertEqual(resp_get.status_code, 200)
+        self.assertContains(resp_get, 'Permanent MDT Episode Deletion')
+
+        resp_del = admin_client.post(reverse('clinical_delete', args=[clin.clinical_id]), {
+            'confirm_delete': 'on'
+        })
+        self.assertEqual(resp_del.status_code, 302)
+        self.assertFalse(ClinicalDetails.objects.filter(clinical_id=clin.clinical_id).exists())
+
+        # Check audit log
+        log = AuditLog.objects.filter(action='DELETE_MDT').first()
+        self.assertIsNotNone(log)
+
+    def test_data_export_endpoints(self):
+        admin_client = Client()
+        admin_client.login(username='adminuser', password='password123')
+
+        # 1. Export Hub View
+        resp_hub = admin_client.get(reverse('export_hub'))
+        self.assertEqual(resp_hub.status_code, 200)
+        self.assertContains(resp_hub, 'Clinical Data Export Hub')
+
+        # 2. Patients CSV Export (contains UTF-8 BOM)
+        resp_pts = admin_client.get(reverse('export_patients_csv'))
+        self.assertEqual(resp_pts.status_code, 200)
+        self.assertEqual(resp_pts['Content-Type'], 'text/csv; charset=utf-8')
+        content_pts = resp_pts.content.decode('utf-8-sig')
+        self.assertIn('Baby Jane Doe', content_pts)
+        self.assertIn('MR_TEST_999', content_pts)
+
+        # 3. MDT Presentations CSV Export
+        resp_mdt = admin_client.get(reverse('export_mdt_csv'))
+        self.assertEqual(resp_mdt.status_code, 200)
+        content_mdt = resp_mdt.content.decode('utf-8-sig')
+        self.assertIn('Clinical ID', content_mdt)
+
+        # 4. Investigations CSV Export
+        resp_inv = admin_client.get(reverse('export_investigations_csv'))
+        self.assertEqual(resp_inv.status_code, 200)
+        content_inv = resp_inv.content.decode('utf-8-sig')
+        self.assertIn('Investigation Type', content_inv)
+
+        # 5. Complete ZIP Export
+        resp_zip = admin_client.get(reverse('export_all_zip'))
+        self.assertEqual(resp_zip.status_code, 200)
+        self.assertEqual(resp_zip['Content-Type'], 'application/zip')
+        self.assertTrue(len(resp_zip.content) > 100)
+

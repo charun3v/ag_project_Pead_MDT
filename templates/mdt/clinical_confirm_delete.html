@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Delete MDT Presentation — Clinical #{{ clinical.clinical_id }} — Pead MDT{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6 col-md-8 col-sm-11">
+    <div class="card card-clinical border-danger shadow-sm">
+      
+      <!-- Card Header -->
+      <div class="card-header bg-danger text-white py-2 px-3 d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i>
+        <span class="fw-bold" style="font-size: 0.95rem;">Permanent MDT Episode Deletion (Admin Confirmation)</span>
+      </div>
+
+      <!-- Card Body -->
+      <div class="card-body p-3">
+        <p class="text-danger fw-semibold mb-2" style="font-size: 0.85rem;">
+          Caution: You are about to permanently delete this clinical presentation and its linked consensus decision.
+        </p>
+
+        <!-- Episode Summary -->
+        <div class="p-3 bg-light border rounded mb-3" style="font-size: 0.82rem;">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-secondary fw-semibold">Patient:</span>
+            <strong class="text-dark">{{ patient.name }} (MR: <code>{{ patient.mr_no }}</code>)</strong>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-secondary fw-semibold">Clinical Presentation ID:</span>
+            <span class="badge bg-secondary">#{{ clinical.clinical_id }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-secondary fw-semibold">MDT ID:</span>
+            <code class="fw-bold fs-6">{{ clinical.mdt_id|default:"Draft / None" }}</code>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-secondary fw-semibold">Planned MDT Date:</span>
+            <span>{{ clinical.date_mdt_planned|date:"d-M-Y"|default:"Not scheduled" }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-secondary fw-semibold">Episode Diagnosis:</span>
+            <span>{{ clinical.diagnosis|default:patient.diagnosis|default:"—" }}</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-secondary fw-semibold">Discussion Reason:</span>
+            <span class="text-truncate" style="max-width: 320px;">{{ clinical.mdt_discussion_for|default:"—" }}</span>
+          </div>
+        </div>
+
+        <!-- Linked Records Breakdown -->
+        <div class="card mb-3 border-warning">
+          <div class="card-header bg-warning-subtle text-dark py-1 px-3 fw-bold small">
+            <i class="bi bi-layers-fill text-warning me-1"></i> Associated Records to be Removed:
+          </div>
+          <div class="card-body p-2" style="font-size: 0.8rem;">
+            <ul class="list-group list-group-flush mb-0">
+              <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                <span><i class="bi bi-chat-square-quote text-success me-2"></i>Linked MDT Consensus Decision</span>
+                <span class="badge {% if has_consensus %}bg-success{% else %}bg-secondary{% endif %} rounded-pill">
+                  {% if has_consensus %}1 (Will be purged){% else %}None{% endif %}
+                </span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                <span><i class="bi bi-droplet text-danger me-2"></i>Blood Investigations Attached</span>
+                <span class="badge bg-secondary rounded-pill">{{ blood_count }}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                <span><i class="bi bi-film text-info me-2"></i>Imaging Scans Attached</span>
+                <span class="badge bg-secondary rounded-pill">{{ imaging_count }}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                <span><i class="bi bi-file-earmark-medical text-warning me-2"></i>Pathology Reports Attached</span>
+                <span class="badge bg-secondary rounded-pill">{{ pathology_count }}</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2">
+                <span><i class="bi bi-diagram-3 text-primary me-2"></i>Molecular Tests Attached</span>
+                <span class="badge bg-secondary rounded-pill">{{ molecular_count }}</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Deletion Form with Checkbox -->
+        <form method="POST">
+          {% csrf_token %}
+          <div class="form-check mb-3">
+            <input class="form-check-input border-danger" type="checkbox" name="confirm_delete" id="confirm_delete_clinical" required>
+            <label class="form-check-label small fw-bold text-danger" for="confirm_delete_clinical">
+              I verify that I want to permanently delete clinical episode #{{ clinical.clinical_id }} (MDT: {{ clinical.mdt_id|default:'Draft' }}) for patient {{ patient.name }}.
+            </label>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+            <a href="{% url 'patient_search' %}?q={{ patient.mr_no }}" class="btn btn-outline-secondary btn-sm px-3">
+              <i class="bi bi-x-circle me-1"></i> Cancel
+            </a>
+            <button type="submit" class="btn btn-danger btn-sm px-4 fw-semibold shadow-sm">
+              <i class="bi bi-trash3-fill me-1"></i> Permanently Delete Episode
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
