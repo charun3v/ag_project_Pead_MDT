@@ -99,10 +99,7 @@
               {% endif %}
             </td>
             <td class="fw-semibold">
-              {% if u.profile.prefix %}
-                <span class="text-primary fw-bold">{{ u.profile.prefix }}</span>
-              {% endif %}
-              {{ u.profile.full_name|default:u.first_name|default:"—" }}
+              {{ u.profile.get_display_name }}
               {% if u.email %}
                 <div class="text-muted small fw-normal" style="font-size: 0.72rem;">{{ u.email }}</div>
               {% endif %}

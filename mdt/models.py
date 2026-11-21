@@ -109,9 +109,19 @@ class UserProfile(models.Model):
     prefix = models.CharField(max_length=20, default='Dr.', blank=True, null=True)
     full_name = models.CharField(max_length=150, blank=True, null=True)
 
+    def get_display_name(self):
+        name = (self.full_name or self.user.get_full_name() or self.user.username).strip()
+        pfx = (self.prefix or '').strip()
+        if pfx:
+            pfx_clean = pfx.rstrip('.').lower()
+            if name.lower().startswith(pfx_clean):
+                return name
+            return f"{pfx} {name}"
+        return name
+
     def __str__(self):
-        pfx = f"{self.prefix} " if self.prefix else ""
-        return f"{pfx}{self.full_name or self.user.username} ({self.role})"
+        return f"{self.get_display_name()} ({self.role})"
+
 
 
 # ==========================================
