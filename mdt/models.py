@@ -119,6 +119,23 @@ class DiscussionPurpose(models.Model):
         return self.name
 
 
+class MDTPanelMember(models.Model):
+    name = models.CharField(max_length=255, unique=True, verbose_name="Panel Member / Specialist Name")
+    specialty = models.CharField(max_length=150, blank=True, null=True, verbose_name="Specialty / Role")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name = "MDT Panel Member"
+        verbose_name_plural = "MDT Panel Members"
+
+    def __str__(self):
+        if self.specialty:
+            return f"{self.name} ({self.specialty})"
+        return self.name
+
+
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('Admin', 'Administrator'),

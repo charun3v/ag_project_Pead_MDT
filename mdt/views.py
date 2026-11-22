@@ -17,7 +17,7 @@ from django.db.models import Q
 from .models import (
     Patient, ClinicalDetails, MDTConsensus, State, District, PrimarySite,
     BloodInvestigation, ImagingInvestigation, PathologyInvestigation, MolecularInvestigation,
-    AuditLog, UserProfile, DiscussionPurpose
+    AuditLog, UserProfile, DiscussionPurpose, MDTPanelMember
 )
 from .forms import (
     PatientForm, ClinicalDetailsForm, MDTConsensusForm,
@@ -616,6 +616,7 @@ def consensus_edit(request, consensus_id):
 
     investigations = get_consolidated_investigations(clinical)
     doctors = UserProfile.objects.filter(role__in=['Consultant', 'Resident', 'Admin', 'SubAdmin']).select_related('user').order_by('full_name')
+    panel_members = MDTPanelMember.objects.filter(is_active=True).order_by('display_order', 'name')
 
     context = {
         'form': form,
@@ -625,6 +626,7 @@ def consensus_edit(request, consensus_id):
         'is_approved': is_approved,
         'investigations': investigations,
         'doctors': doctors,
+        'panel_members': panel_members,
     }
     return render(request, 'mdt/consensus_form.html', context)
 
@@ -653,6 +655,7 @@ def live_presentation(request, consensus_id):
         return redirect('live_presentation', consensus_id=consensus.consensus_id)
 
     doctors = UserProfile.objects.filter(role__in=['Consultant', 'Resident', 'Admin', 'SubAdmin']).select_related('user').order_by('full_name')
+    panel_members = MDTPanelMember.objects.filter(is_active=True).order_by('display_order', 'name')
 
     context = {
         'consensus': consensus,
@@ -660,8 +663,39 @@ def live_presentation(request, consensus_id):
         'patient': patient,
         'investigations': investigations,
         'doctors': doctors,
+        'panel_members': panel_members,
     }
     return render(request, 'mdt/live_presentation.html', context)
+
+
+@login_required
+def api_add_panel_member(request):
+    """
+    API / endpoint to add a custom panel member name to MDTPanelMember lookup.
+    """
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        specialty = request.POST.get('specialty', '').strip()
+        if not name:
+            return JsonResponse({'success': False, 'error': 'Name is required.'}, status=400)
+        
+        member, created = MDTPanelMember.objects.get_or_create(
+            name=name,
+            defaults={
+                'specialty': specialty,
+                'is_active': True,
+                'display_order': MDTPanelMember.objects.count() + 1
+            }
+        )
+        return JsonResponse({
+            'success': True,
+            'created': created,
+            'id': member.id,
+            'name': member.name,
+            'specialty': member.specialty,
+            'display': str(member)
+        })
+    return JsonResponse({'success': False, 'error': 'POST method required.'}, status=405)
 
 
 # ==========================================

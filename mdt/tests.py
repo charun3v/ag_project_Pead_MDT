@@ -571,6 +571,54 @@ class PeadMDTTests(TestCase):
         self.assertTrue(lock_status_reopened['can_edit'])
         self.assertFalse(lock_status_reopened['is_locked'])
 
+    def test_quick_add_panel_members(self):
+        """
+        Verify:
+        1. MDTPanelMember creation & configuration in lookups.
+        2. api_add_panel_member endpoint adds custom specialist.
+        3. Consensus form renders configurable panel members and multi-select user list.
+        """
+        from .models import MDTPanelMember
+
+        member = MDTPanelMember.objects.create(
+            name='Dr. Paediatric Neurosurgeon',
+            specialty='Neurosurgery',
+            display_order=1
+        )
+        self.assertEqual(str(member), 'Dr. Paediatric Neurosurgeon (Neurosurgery)')
+
+        # Test API add panel member
+        resp_api = self.client.post(reverse('api_add_panel_member'), {
+            'name': 'Dr. Visiting Geneticist',
+            'specialty': 'Genetics'
+        })
+        self.assertEqual(resp_api.status_code, 200)
+        data = resp_api.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['name'], 'Dr. Visiting Geneticist')
+
+        # Test Consensus view loads panel members and doctors
+        clin = ClinicalDetails.objects.create(
+            patient=self.patient,
+            height=95.0,
+            weight=15.0,
+            diagnosis='Retinoblastoma',
+            status='Scheduled',
+            date_mdt_planned=date.today()
+        )
+        consensus = MDTConsensus.objects.create(
+            clinical_details=clin,
+            mdt_id='PED20260000088',
+            status='Draft'
+        )
+
+        resp_cons = self.client.get(reverse('consensus_edit', args=[consensus.consensus_id]))
+        self.assertEqual(resp_cons.status_code, 200)
+        self.assertContains(resp_cons, 'Dr. Paediatric Neurosurgeon')
+        self.assertContains(resp_cons, 'Select Users')
+        self.assertContains(resp_cons, 'Custom Name')
+
+
 
 
 

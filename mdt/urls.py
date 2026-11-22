@@ -54,6 +54,7 @@ urlpatterns = [
     path('lookups/<str:category>/reorder/', views.lookup_reorder_view, name='lookup_reorder'),
     path('api/discussion-purposes/add/', views.api_add_discussion_purpose, name='api_add_discussion_purpose'),
     path('api/discussion-purposes/reorder/', views.api_reorder_discussion_purposes, name='api_reorder_discussion_purposes'),
+    path('api/panel-members/add/', views.api_add_panel_member, name='api_add_panel_member'),
 
     # Dedicated Gynae-Style Multi-Modality Investigation Pages
     path('clinical/<int:clinical_id>/investigations/', views.investigations_hub_view, name='investigations_hub'),

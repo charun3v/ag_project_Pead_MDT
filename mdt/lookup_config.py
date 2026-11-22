@@ -1,6 +1,6 @@
 from .models import (
     DiscussionPurpose, PrimarySite, BloodSpecimenType,
-    ImagingType, ImagingSite, PathologySpecimenType, MolecularTestType
+    ImagingType, ImagingSite, PathologySpecimenType, MolecularTestType, MDTPanelMember
 )
 
 LOOKUP_CONFIG = {
@@ -73,6 +73,16 @@ LOOKUP_CONFIG = {
         'name_field': 'name',
         'name_label': 'Test Type (e.g. FISH, NGS Panel, RT-PCR, Karyotyping, Sanger Sequencing, IHC)',
         'description': 'Genomic, biomarker, cytogenetic, and translocation assay types.',
+    },
+    'panel_members': {
+        'title': 'MDT Quick-Add Panel Members',
+        'icon': '👥',
+        'table_name': 'tblMDTPanelMember',
+        'model': MDTPanelMember,
+        'pk': 'id',
+        'name_field': 'name',
+        'name_label': 'Specialist / Panel Member Name (e.g. Dr. A (Pediatric Surgeon), Dr. B (Radiologist))',
+        'description': 'Specialists and consultants displayed as quick-add buttons in the MDT Consensus Form and Live Screen.',
     },
 }
 

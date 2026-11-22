@@ -70,28 +70,26 @@
         </div>
       </div>
 
-      <!-- Paediatric Vitals & Auto BSA / BMI Bar -->
-      <div class="p-2 mb-2 rounded bg-light border">
-        <div class="row g-2 align-items-center">
-          <div class="col-6 col-sm-3">
-            <label class="form-label-compact" for="{{ form.height.id_for_label }}">Height (cm)</label>
-            {{ form.height }}
+      <!-- Paediatric Vitals & Auto BSA / BMI Bar (Horizontally Compact: 5-10 chars based on heading) -->
+      <div class="d-inline-flex flex-wrap align-items-center gap-3 p-1 px-3 mb-2 rounded bg-light border">
+        <div style="width: 80px;">
+          <label class="form-label-compact mb-0 text-truncate d-block" for="{{ form.height.id_for_label }}">Height (cm)</label>
+          <input type="number" step="0.1" name="height" id="id_height" value="{{ form.height.value|default:'' }}" class="form-control form-control-sm text-center fw-bold px-1" style="width: 80px;" placeholder="cm">
+        </div>
+        <div style="width: 80px;">
+          <label class="form-label-compact mb-0 text-truncate d-block" for="{{ form.weight.id_for_label }}">Weight (kg)</label>
+          <input type="number" step="0.1" name="weight" id="id_weight" value="{{ form.weight.value|default:'' }}" class="form-control form-control-sm text-center fw-bold px-1" style="width: 80px;" placeholder="kg">
+        </div>
+        <div style="width: 85px;">
+          <div class="form-label-compact mb-0 text-primary fw-bold text-center">BSA</div>
+          <div class="badge bg-primary text-white py-1 px-1 d-block text-center fs-6" id="calc_bsa" style="width: 85px;">
+            {% if clinical.bsa %}{{ clinical.bsa }} m²{% else %}—{% endif %}
           </div>
-          <div class="col-6 col-sm-3">
-            <label class="form-label-compact" for="{{ form.weight.id_for_label }}">Weight (kg)</label>
-            {{ form.weight }}
-          </div>
-          <div class="col-6 col-sm-3">
-            <div class="form-label-compact text-primary fw-bold">Body Surface Area (BSA)</div>
-            <div class="badge bg-primary text-white p-2 d-block text-center fs-6" id="calc_bsa">
-              {% if clinical.bsa %}{{ clinical.bsa }} m²{% else %}—{% endif %}
-            </div>
-          </div>
-          <div class="col-6 col-sm-3">
-            <div class="form-label-compact text-secondary fw-bold">Body Mass Index (BMI)</div>
-            <div class="badge bg-secondary text-white p-2 d-block text-center fs-6" id="calc_bmi">
-              {% if clinical.bmi %}{{ clinical.bmi }} kg/m²{% else %}—{% endif %}
-            </div>
+        </div>
+        <div style="width: 85px;">
+          <div class="form-label-compact mb-0 text-secondary fw-bold text-center">BMI</div>
+          <div class="badge bg-secondary text-white py-1 px-1 d-block text-center fs-6" id="calc_bmi" style="width: 85px;">
+            {% if clinical.bmi %}{{ clinical.bmi }} kg/m²{% else %}—{% endif %}
           </div>
         </div>
       </div>
@@ -108,31 +106,12 @@
         </div>
       </div>
 
-      <!-- 2. Previous Treatment Details (Bigger Text Box) -->
-      <div class="mb-2">
-        <label class="form-label-compact" for="{{ form.prev_tx_history.id_for_label }}">Previous Treatment Details</label>
-        {{ form.prev_tx_history }}
-      </div>
-
-      <!-- 3. MDT Discussion Purpose (Reference Lookup) -->
-      <div class="mb-2">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-          <label class="form-label-compact mb-0" for="{{ form.discussion_purpose.id_for_label }}">MDT Discussion Purpose</label>
-          {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
-          <div class="d-flex gap-2 align-items-center">
-            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold text-primary" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalAddPurpose">
-              <i class="bi bi-plus-circle me-1"></i> Add / Manage Purpose Options
-            </button>
-          </div>
-          {% endif %}
+      <!-- 2. Previous Treatment Details (Half as wide) -->
+      <div class="row g-2 mb-2">
+        <div class="col-12 col-md-6">
+          <label class="form-label-compact" for="{{ form.prev_tx_history.id_for_label }}">Previous Treatment Details</label>
+          {{ form.prev_tx_history }}
         </div>
-        {{ form.discussion_purpose }}
-      </div>
-
-      <!-- 4. Specific Clinical Questions for MDT Panel -->
-      <div class="mb-2">
-        <label class="form-label-compact" for="{{ form.mdt_discussion_for.id_for_label }}">Specific Clinical Questions for MDT Panel</label>
-        {{ form.mdt_discussion_for }}
       </div>
 
       <!-- Clinical Action Bar (Directly below clinical data) -->
@@ -469,10 +448,40 @@
     </div>
   </div>
 
-  <!-- 3. Bottom Scheduling Section: MDT planned on: -> [ Schedule MDT ] -->
+  <!-- 3. Bottom Section: MDT Discussion Purpose, Specific Questions & Scheduling (Below Investigations Hub) -->
   <div class="card card-clinical mt-2 mb-2 border-primary shadow-sm">
-    <div class="card-body py-2 px-3">
-      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+    <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+      <strong><i class="bi bi-chat-square-dots text-primary me-1"></i> MDT Purpose, Clinical Questions & Scheduling</strong>
+      <small class="text-muted">Multidisciplinary Review Planning</small>
+    </div>
+    <div class="card-body p-2">
+      <!-- MDT Discussion Purpose & Specific Clinical Questions (Below Investigations Hub) -->
+      <div class="row g-2 mb-2">
+        <div class="col-12 col-md-5">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <label class="form-label-compact mb-0" for="{{ form.discussion_purpose.id_for_label }}">
+              <i class="bi bi-tag text-primary me-1"></i> MDT Discussion Purpose
+            </label>
+            {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
+            <div class="d-flex gap-2 align-items-center">
+              <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold text-primary" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalAddPurpose">
+                <i class="bi bi-plus-circle me-1"></i> Add / Manage Purpose Options
+              </button>
+            </div>
+            {% endif %}
+          </div>
+          {{ form.discussion_purpose }}
+        </div>
+        <div class="col-12 col-md-7">
+          <label class="form-label-compact" for="{{ form.mdt_discussion_for.id_for_label }}">
+            <i class="bi bi-question-circle text-primary me-1"></i> Specific Clinical Questions for MDT Panel
+          </label>
+          {{ form.mdt_discussion_for }}
+        </div>
+      </div>
+
+      <!-- MDT Scheduled Row -->
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 p-2 rounded bg-light border">
         <!-- Left: Date Picker and Schedule Button -->
         <div class="d-flex flex-wrap align-items-center gap-2">
           <label for="id_date_mdt_planned" class="fw-bold text-dark mb-0 fs-6">
