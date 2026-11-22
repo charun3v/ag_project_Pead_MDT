@@ -92,6 +92,21 @@ class MolecularTestType(models.Model):
         return self.name
 
 
+class DiscussionPurpose(models.Model):
+    purpose_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="MDT Discussion Purpose")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name = "MDT Discussion Purpose"
+        verbose_name_plural = "MDT Discussion Purposes"
+
+    def __str__(self):
+        return self.name
+
+
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('Admin', 'Administrator'),
@@ -243,12 +258,13 @@ class ClinicalDetails(models.Model):
     stage = models.CharField(max_length=100, blank=True, null=True)
     presenting_complaints = models.TextField(blank=True, null=True, verbose_name="Presenting Complaints")
     examination_findings = models.TextField(blank=True, null=True, verbose_name="Examination Findings")
-    prev_tx_history = models.CharField(max_length=255, blank=True, null=True, verbose_name="Previous Treatment History")
+    prev_tx_history = models.TextField(blank=True, null=True, verbose_name="Previous Treatment Details")
     diagnosis = models.CharField(max_length=255, blank=True, null=True, verbose_name="Episode Diagnosis")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Draft')
     
-    discussion_category = models.CharField(max_length=50, choices=DISCUSSION_CHOICES, default='Initial Staging')
-    mdt_discussion_for = models.TextField(blank=True, null=True, verbose_name="MDT Discussion Specific Questions")
+    discussion_purpose = models.ForeignKey(DiscussionPurpose, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="MDT Discussion Purpose", related_name='clinical_episodes')
+    discussion_category = models.CharField(max_length=100, blank=True, null=True, verbose_name="Legacy Discussion Category")
+    mdt_discussion_for = models.TextField(blank=True, null=True, verbose_name="Specific Clinical Questions for MDT Panel")
     date_mdt_planned = models.DateField(null=True, blank=True, verbose_name="Planned MDT Date")
     
     entered_by = models.CharField(max_length=100, blank=True, null=True)
@@ -261,6 +277,12 @@ class ClinicalDetails(models.Model):
 
     def __str__(self):
         return f"Clinical #{self.clinical_id} - {self.patient.name} ({self.status})"
+
+    @property
+    def discussion_purpose_display(self):
+        if self.discussion_purpose:
+            return self.discussion_purpose.name
+        return self.discussion_category or "Initial Staging"
 
     @property
     def bsa(self):

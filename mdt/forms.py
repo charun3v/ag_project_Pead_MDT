@@ -3,7 +3,7 @@ from .models import (
     Patient, ClinicalDetails, MDTConsensus,
     BloodInvestigation, ImagingInvestigation, PathologyInvestigation, MolecularInvestigation,
     State, District, PrimarySite, BloodSpecimenType, ImagingType, ImagingSite,
-    PathologySpecimenType, MolecularTestType, UserProfile
+    PathologySpecimenType, MolecularTestType, UserProfile, DiscussionPurpose
 )
 from django.contrib.auth.models import User
 
@@ -40,22 +40,28 @@ class ClinicalDetailsForm(forms.ModelForm):
     class Meta:
         model = ClinicalDetails
         fields = [
-            'height', 'weight', 'stage', 'diagnosis', 'prev_tx_history',
-            'discussion_category', 'date_mdt_planned', 'mdt_discussion_for',
-            'presenting_complaints', 'examination_findings'
+            'height', 'weight', 'stage', 'diagnosis', 'date_mdt_planned',
+            'presenting_complaints', 'examination_findings',
+            'prev_tx_history', 'discussion_purpose', 'mdt_discussion_for'
         ]
         widgets = {
             'height': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.1', 'id': 'id_height', 'placeholder': 'cm'}),
             'weight': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.1', 'id': 'id_weight', 'placeholder': 'kg'}),
             'stage': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'e.g. Stage III / High Risk'}),
             'diagnosis': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Episode Diagnosis (cascades to master on save)'}),
-            'prev_tx_history': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'e.g. Chemotherapy Cycle 3 completed'}),
-            'discussion_category': forms.Select(attrs={'class': 'form-select form-select-sm'}),
             'date_mdt_planned': forms.DateInput(attrs={'class': 'form-control form-control-sm', 'type': 'date'}),
-            'mdt_discussion_for': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2, 'placeholder': 'Key clinical questions for the multidisciplinary panel...'}),
-            'presenting_complaints': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Symptoms, duration, presentation...'}),
-            'examination_findings': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'General, vitals, systemic and local examination...'}),
+            'presenting_complaints': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Presenting symptoms, duration, clinical course...'}),
+            'examination_findings': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'General vitals, systemic examination and local physical findings...'}),
+            'prev_tx_history': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Prior chemotherapy protocols, surgical resections, radiotherapy details, and treatment response...'}),
+            'discussion_purpose': forms.Select(attrs={'class': 'form-select form-select-sm', 'id': 'id_discussion_purpose'}),
+            'mdt_discussion_for': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Specific clinical questions for the multidisciplinary panel to deliberate...'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['discussion_purpose'].queryset = DiscussionPurpose.objects.filter(is_active=True).order_by('display_order', 'name')
+        self.fields['discussion_purpose'].empty_label = "-- Select MDT Discussion Purpose --"
+
 
 
 class MDTConsensusForm(forms.ModelForm):

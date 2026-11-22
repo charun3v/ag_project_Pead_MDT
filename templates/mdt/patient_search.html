@@ -121,7 +121,7 @@
             <td><strong>{{ ep.date_mdt_planned|date:"d-M-Y"|default:"—" }}</strong></td>
             <td>{{ ep.diagnosis|default:patient.diagnosis|default:"—" }}</td>
             <td>
-              <span class="badge bg-light text-secondary border">{{ ep.discussion_category }}</span>
+              <span class="badge bg-light text-secondary border">{{ ep.discussion_purpose_display }}</span>
               {% if ep.mdt_discussion_for %}
               <div class="text-muted small text-truncate" style="max-width: 150px;">{{ ep.mdt_discussion_for }}</div>
               {% endif %}

@@ -124,7 +124,7 @@
   <!-- Clinical Case Presentation -->
   <div class="section-title">Clinical Presentation & Case Background</div>
   <div class="small mb-2">
-    <div class="mb-1"><strong>MDT Discussion Intent:</strong> {{ clinical.discussion_category }} &bull; {{ clinical.mdt_discussion_for|default:"General staging and management." }}</div>
+    <div class="mb-1"><strong>MDT Discussion Intent:</strong> {{ clinical.discussion_purpose_display }} &bull; {{ clinical.mdt_discussion_for|default:"General staging and management." }}</div>
     <div class="mb-1"><strong>Presenting Complaints:</strong> {{ clinical.presenting_complaints|default:"None entered." }}</div>
     <div class="mb-1"><strong>Physical & Systemic Findings:</strong> {{ clinical.examination_findings|default:"None entered." }}</div>
     {% if clinical.prev_tx_history %}

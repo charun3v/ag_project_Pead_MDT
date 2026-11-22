@@ -16,7 +16,7 @@ from django.db.models import Q
 from .models import (
     Patient, ClinicalDetails, MDTConsensus, State, District, PrimarySite,
     BloodInvestigation, ImagingInvestigation, PathologyInvestigation, MolecularInvestigation,
-    AuditLog, UserProfile
+    AuditLog, UserProfile, DiscussionPurpose
 )
 from .forms import (
     PatientForm, ClinicalDetailsForm, MDTConsensusForm,
@@ -248,17 +248,21 @@ def clinical_create(request, mr_no):
             messages.success(request, f"Clinical Presentation #{clinical.clinical_id} saved as Draft.")
             return redirect('clinical_edit', clinical_id=clinical.clinical_id)
     else:
+        initial_purpose = DiscussionPurpose.objects.filter(is_active=True).first()
         initial = {
             'diagnosis': patient.diagnosis,
             'date_mdt_planned': date.today() + timedelta(days=7),
-            'discussion_category': 'Initial Staging',
+            'discussion_purpose': initial_purpose,
         }
         form = ClinicalDetailsForm(initial=initial)
+
+    discussion_purposes = DiscussionPurpose.objects.filter(is_active=True).order_by('display_order', 'name')
 
     return render(request, 'mdt/clinical_form.html', {
         'form': form,
         'patient': patient,
         'is_new': True,
+        'discussion_purposes': discussion_purposes,
     })
 
 
@@ -334,6 +338,7 @@ def clinical_edit(request, clinical_id):
         'imaging_form': imaging_form,
         'path_form': path_form,
         'mol_form': mol_form,
+        'discussion_purposes': DiscussionPurpose.objects.filter(is_active=True).order_by('display_order', 'name'),
     }
     return render(request, 'mdt/clinical_form.html', context)
 
@@ -575,6 +580,110 @@ def audit_log_view(request):
 
     logs = logs[:100]
     return render(request, 'mdt/audit_log.html', {'logs': logs, 'query': query})
+
+
+# ==========================================
+# Reference Lookups Management (Admin / SubAdmin)
+# ==========================================
+
+@login_required
+def manage_purposes_view(request):
+    if not is_admin_user(request.user):
+        messages.error(request, "Access restricted to Administrators.")
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add':
+            name = request.POST.get('name', '').strip()
+            order_raw = request.POST.get('display_order', '').strip()
+            if name:
+                order_val = int(order_raw) if order_raw.isdigit() else (DiscussionPurpose.objects.count() + 1)
+                obj, created = DiscussionPurpose.objects.get_or_create(
+                    name=name,
+                    defaults={'display_order': order_val, 'is_active': True}
+                )
+                if not created and not obj.is_active:
+                    obj.is_active = True
+                    obj.save()
+                write_audit_log(
+                    request.user,
+                    "ADD_PURPOSE",
+                    "tblDiscussionPurpose",
+                    name,
+                    f"Admin {request.user.username} created discussion purpose '{name}'."
+                )
+                messages.success(request, f"Discussion Purpose '{name}' added successfully.")
+            else:
+                messages.error(request, "Discussion purpose name cannot be empty.")
+
+        elif action == 'toggle':
+            purpose_id = request.POST.get('purpose_id')
+            p = get_object_or_404(DiscussionPurpose, purpose_id=purpose_id)
+            p.is_active = not p.is_active
+            p.save()
+            status_text = "activated" if p.is_active else "deactivated"
+            write_audit_log(
+                request.user,
+                "TOGGLE_PURPOSE",
+                "tblDiscussionPurpose",
+                p.name,
+                f"Admin {request.user.username} {status_text} purpose '{p.name}'."
+            )
+            messages.success(request, f"Purpose '{p.name}' has been {status_text}.")
+
+        elif action == 'delete':
+            if is_admin_only(request.user):
+                purpose_id = request.POST.get('purpose_id')
+                p = get_object_or_404(DiscussionPurpose, purpose_id=purpose_id)
+                p_name = p.name
+                p.delete()
+                write_audit_log(
+                    request.user,
+                    "DELETE_PURPOSE",
+                    "tblDiscussionPurpose",
+                    p_name,
+                    f"Admin {request.user.username} deleted purpose '{p_name}'."
+                )
+                messages.success(request, f"Purpose '{p_name}' permanently deleted.")
+            else:
+                messages.error(request, "Only Administrators can delete lookup entries.")
+
+        return redirect('manage_purposes')
+
+    purposes = DiscussionPurpose.objects.all().order_by('display_order', 'name')
+    return render(request, 'mdt/manage_purposes.html', {'purposes': purposes})
+
+
+@login_required
+def api_add_discussion_purpose(request):
+    if not is_admin_user(request.user):
+        return JsonResponse({'error': 'Access denied: Administrators only'}, status=403)
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        if not name:
+            return JsonResponse({'error': 'Purpose name cannot be empty'}, status=400)
+
+        obj, created = DiscussionPurpose.objects.get_or_create(
+            name=name,
+            defaults={'display_order': DiscussionPurpose.objects.count() + 1, 'is_active': True}
+        )
+        if not obj.is_active:
+            obj.is_active = True
+            obj.save()
+
+        write_audit_log(
+            request.user,
+            "ADD_LOOKUP",
+            "tblDiscussionPurpose",
+            name,
+            f"Admin {request.user.username} added MDT discussion purpose '{name}'."
+        )
+        return JsonResponse({'id': obj.purpose_id, 'name': obj.name, 'created': created})
+
+    return JsonResponse({'error': 'POST method required'}, status=405)
+
 
 
 # ==========================================
@@ -1027,7 +1136,7 @@ def generate_mdt_csv():
             c.stage or '',
             c.diagnosis or '',
             c.prev_tx_history or '',
-            c.discussion_category or '',
+            c.discussion_purpose_display or '',
             c.mdt_discussion_for or '',
             c.presenting_complaints or '',
             c.examination_findings or '',

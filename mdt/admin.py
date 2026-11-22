@@ -3,8 +3,10 @@ from .models import (
     State, District, PrimarySite, BloodSpecimenType, ImagingType, ImagingSite,
     PathologySpecimenType, MolecularTestType, UserProfile, Patient,
     ClinicalDetails, MDTConsensus, BloodInvestigation, ImagingInvestigation,
-    PathologyInvestigation, MolecularInvestigation, AuditLog, MDTYearSequence
+    PathologyInvestigation, MolecularInvestigation, AuditLog, MDTYearSequence,
+    DiscussionPurpose
 )
+
 
 
 @admin.register(Patient)
@@ -58,6 +60,14 @@ class AuditLogAdmin(admin.ModelAdmin):
     search_fields = ('username', 'action', 'table_affected', 'record_ref', 'notes')
     list_filter = ('action', 'table_affected', 'timestamp')
     readonly_fields = [f.name for f in AuditLog._meta.fields]
+
+
+@admin.register(DiscussionPurpose)
+class DiscussionPurposeAdmin(admin.ModelAdmin):
+    list_display = ('purpose_id', 'name', 'display_order', 'is_active')
+    list_editable = ('display_order', 'is_active')
+    search_fields = ('name',)
+    ordering = ('display_order', 'name')
 
 
 admin.site.register(State)

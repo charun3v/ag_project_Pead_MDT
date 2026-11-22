@@ -105,7 +105,7 @@
                 <td>{{ m.patient.name }}</td>
                 <td><span class="text-truncate d-inline-block" style="max-width: 140px;">{{ m.diagnosis|default:"—" }}</span></td>
                 <td><span class="badge bg-light text-dark border">{{ m.mdt_id|default:"Pending" }}</span></td>
-                <td><small class="text-muted text-truncate d-inline-block" style="max-width: 130px;">{{ m.mdt_discussion_for|default:m.discussion_category }}</small></td>
+                <td><small class="text-muted text-truncate d-inline-block" style="max-width: 130px;">{{ m.discussion_purpose_display }}</small></td>
                 <td class="text-end text-nowrap">
                   <a href="{% url 'clinical_edit' m.clinical_id %}" class="btn btn-outline-secondary btn-sm py-0 px-1" title="View/Edit Clinical Case">
                     <i class="bi bi-file-earmark-medical"></i>

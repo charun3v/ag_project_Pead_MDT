@@ -43,6 +43,10 @@ urlpatterns = [
     path('export/audit-logs/', views.export_audit_logs_csv_view, name='export_audit_logs_csv'),
     path('export/all-zip/', views.export_all_zip_view, name='export_all_zip'),
 
+    # Reference Lookups Management (Admin / SubAdmin)
+    path('lookups/discussion-purposes/', views.manage_purposes_view, name='manage_purposes'),
+    path('api/discussion-purposes/add/', views.api_add_discussion_purpose, name='api_add_discussion_purpose'),
+
     # Audit Logs
     path('audit-log/', views.audit_log_view, name='audit_log_view'),
 ]

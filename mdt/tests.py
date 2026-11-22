@@ -5,7 +5,7 @@ from django.urls import reverse
 from mdt.models import (
     Patient, ClinicalDetails, MDTConsensus, State, District, PrimarySite,
     BloodSpecimenType, ImagingType, ImagingSite, PathologySpecimenType, MolecularTestType,
-    AuditLog, UserProfile, BloodInvestigation
+    AuditLog, UserProfile, BloodInvestigation, DiscussionPurpose
 )
 from mdt.services import generate_next_mdt_id, cascade_diagnosis
 
@@ -31,6 +31,7 @@ class PeadMDTTests(TestCase):
         self.imaging_site = ImagingSite.objects.create(id=1, name='Abdomen')
         self.path_specimen = PathologySpecimenType.objects.create(id=1, name='Biopsy')
         self.mol_type = MolecularTestType.objects.create(id=1, name='FISH')
+        self.purpose = DiscussionPurpose.objects.create(name='Initial Staging & Treatment Planning', display_order=1)
 
         # Test Patient
         self.patient = Patient.objects.create(
@@ -124,7 +125,8 @@ class PeadMDTTests(TestCase):
             'height': 90.0,
             'weight': 14.0,
             'stage': 'Stage 4',
-            'discussion_category': 'Initial Staging',
+            'discussion_purpose': self.purpose.purpose_id,
+            'prev_tx_history': 'Prior chemo completed cycle 2',
             'date_mdt_planned': date.today() + timedelta(days=3),
             'mdt_discussion_for': 'Surgical resectability'
         })
@@ -354,4 +356,43 @@ class PeadMDTTests(TestCase):
         self.assertEqual(resp_zip.status_code, 200)
         self.assertEqual(resp_zip['Content-Type'], 'application/zip')
         self.assertTrue(len(resp_zip.content) > 100)
+
+    def test_discussion_purpose_lookup_and_api(self):
+        admin_client = Client()
+        admin_client.login(username='adminuser', password='password123')
+
+        # 1. Access manage purposes page
+        resp = admin_client.get(reverse('manage_purposes'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'MDT Discussion Purpose Reference Table')
+
+        # 2. Add new purpose via page POST
+        resp_add = admin_client.post(reverse('manage_purposes'), {
+            'action': 'add',
+            'name': 'Proton Beam Evaluation',
+            'display_order': 20
+        })
+        self.assertEqual(resp_add.status_code, 302)
+        p = DiscussionPurpose.objects.filter(name='Proton Beam Evaluation').first()
+        self.assertIsNotNone(p)
+        self.assertTrue(p.is_active)
+
+        # 3. Toggle purpose
+        resp_toggle = admin_client.post(reverse('manage_purposes'), {
+            'action': 'toggle',
+            'purpose_id': p.purpose_id
+        })
+        self.assertEqual(resp_toggle.status_code, 302)
+        p.refresh_from_db()
+        self.assertFalse(p.is_active)
+
+        # 4. Add purpose via JSON API (AJAX inline add on clinical page)
+        resp_api = admin_client.post(reverse('api_add_discussion_purpose'), {
+            'name': 'Marrow Assessment'
+        })
+        self.assertEqual(resp_api.status_code, 200)
+        data = resp_api.json()
+        self.assertEqual(data['name'], 'Marrow Assessment')
+        self.assertTrue(DiscussionPurpose.objects.filter(name='Marrow Assessment').exists())
+
 

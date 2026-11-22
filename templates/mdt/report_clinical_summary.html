@@ -126,7 +126,7 @@
   <!-- Clinical Presentation & History -->
   <div class="section-title">Clinical Presentation & MDT Intent</div>
   <div class="small mb-2">
-    <div class="mb-1"><strong>Discussion Purpose:</strong> {{ clinical.discussion_category }}</div>
+    <div class="mb-1"><strong>Discussion Purpose:</strong> {{ clinical.discussion_purpose_display }}</div>
     <div class="mb-1"><strong>Specific Questions for Panel:</strong> {{ clinical.mdt_discussion_for|default:"General consensus and treatment sequencing." }}</div>
     <div class="mb-1"><strong>Presenting Complaints:</strong> {{ clinical.presenting_complaints|default:"None entered." }}</div>
     <div class="mb-1"><strong>Physical Findings:</strong> {{ clinical.examination_findings|default:"None entered." }}</div>
