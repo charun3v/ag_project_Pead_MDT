@@ -2,8 +2,9 @@ import json
 import csv
 import io
 import zipfile
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, time
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -82,11 +83,11 @@ def dashboard(request):
     today = date.today()
     ten_days_later = today + timedelta(days=10)
 
-    # 1. Upcoming MDTs (next 10 days, status='Approved')
+    # 1. Upcoming MDTs (next 10 days, status in ['Scheduled', 'Approved'])
     upcoming_mdts = ClinicalDetails.objects.filter(
         date_mdt_planned__gte=today,
         date_mdt_planned__lte=ten_days_later,
-        status='Approved'
+        status__in=['Scheduled', 'Approved']
     ).select_related('patient').order_by('date_mdt_planned')
 
     # 2. Recent Conducted MDTs (Approved consensus, top 10)
@@ -271,37 +272,101 @@ def clinical_create(request, mr_no):
 def clinical_edit(request, clinical_id):
     clinical = get_object_or_404(ClinicalDetails.objects.select_related('patient', 'consensus'), clinical_id=clinical_id)
     patient = clinical.patient
-    is_approved = clinical.status == 'Approved'
+    lock_info = clinical.get_lock_status(request.user)
+    is_editable = lock_info['can_edit']
+    is_approved = clinical.is_approved
 
-    if request.method == 'POST' and not is_approved:
+    if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'save_draft':
+        # 1. Re-scheduling MDT: allowed for all authorized staff to unlock or reschedule
+        if action == 'reschedule_mdt':
+            new_date_str = request.POST.get('date_mdt_planned')
+            if not new_date_str:
+                messages.error(request, "Please provide a valid Planned MDT Date.")
+                return redirect('clinical_edit', clinical_id=clinical.clinical_id)
+            try:
+                new_date = datetime.strptime(new_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                messages.error(request, "Invalid date format for Planned MDT Date.")
+                return redirect('clinical_edit', clinical_id=clinical.clinical_id)
+
+            with transaction.atomic():
+                old_date = clinical.date_mdt_planned
+                clinical.date_mdt_planned = new_date
+                clinical.status = 'Scheduled'
+                if not clinical.mdt_id:
+                    clinical.mdt_id = generate_next_mdt_id()
+                    clinical.approved_by = request.user.username
+                    clinical.approved_on = timezone.now()
+                clinical.save()
+
+                consensus, _ = MDTConsensus.objects.get_or_create(
+                    clinical_details=clinical,
+                    defaults={
+                        'mdt_id': clinical.mdt_id,
+                        'date_mdt_conducted': new_date,
+                        'status': 'Draft',
+                        'entered_by': request.user.username,
+                    }
+                )
+                if consensus:
+                    consensus.date_mdt_conducted = new_date
+                    consensus.save()
+
+                write_audit_log(
+                    request.user, "RESCHEDULE_MDT", "tblClinicalDetails", patient.mr_no,
+                    f"Rescheduled Clinical #{clinical.clinical_id} from {old_date} to {new_date}"
+                )
+                messages.success(
+                    request,
+                    f"MDT successfully re-scheduled to {new_date.strftime('%d-%b-%Y')}. "
+                    f"Clinical presentation is editable until 17:00 hrs on {new_date.strftime('%d-%b-%Y')}."
+                )
+                return redirect('clinical_edit', clinical_id=clinical.clinical_id)
+
+        # 2. Block modifications if past 17:00 and user is non-admin
+        elif not is_editable:
+            messages.error(
+                request,
+                f"Record is locked (past 17:00 on scheduled date {clinical.date_mdt_planned}). "
+                f"Only Administrators can edit directly. Click 'Re-schedule MDT' below to reopen editing."
+            )
+            return redirect('clinical_edit', clinical_id=clinical.clinical_id)
+
+        # 3. Save Draft
+        elif action == 'save_draft':
             form = ClinicalDetailsForm(request.POST, instance=clinical)
             if form.is_valid():
                 c = form.save(commit=False)
-                c.status = 'Draft'
+                if c.status not in ['Scheduled', 'Approved']:
+                    c.status = 'Draft'
                 c.save()
                 if c.diagnosis:
                     cascade_diagnosis(patient.mr_no, c.diagnosis, request.user)
                 write_audit_log(request.user, "SAVE_CLINICAL", "tblClinicalDetails", patient.mr_no, f"ClinicalID: {c.clinical_id}")
-                messages.success(request, "Clinical details saved as Draft.")
+                messages.success(request, "Clinical presentation saved as Draft.")
                 return redirect('clinical_edit', clinical_id=clinical.clinical_id)
 
-        elif action == 'approve':
+        # 4. Schedule MDT / Approve
+        elif action in ['schedule_mdt', 'approve']:
             form = ClinicalDetailsForm(request.POST, instance=clinical)
             if form.is_valid():
                 with transaction.atomic():
                     c = form.save(commit=False)
-                    new_mdt_id = generate_next_mdt_id()
+                    if not c.date_mdt_planned:
+                        messages.error(request, "Please enter a Planned MDT Date before scheduling.")
+                        return redirect('clinical_edit', clinical_id=clinical.clinical_id)
+
+                    new_mdt_id = c.mdt_id or generate_next_mdt_id()
                     c.mdt_id = new_mdt_id
-                    c.status = 'Approved'
+                    c.status = 'Scheduled' if action == 'schedule_mdt' else 'Approved'
                     c.approved_by = request.user.username
                     c.approved_on = timezone.now()
                     c.save()
 
-                    # Create MDTConsensus stub if not exists
-                    MDTConsensus.objects.get_or_create(
+                    # Create or sync MDTConsensus stub
+                    consensus, _ = MDTConsensus.objects.get_or_create(
                         clinical_details=c,
                         defaults={
                             'mdt_id': new_mdt_id,
@@ -310,12 +375,20 @@ def clinical_edit(request, clinical_id):
                             'entered_by': request.user.username,
                         }
                     )
+                    if consensus and c.date_mdt_planned:
+                        consensus.date_mdt_conducted = c.date_mdt_planned
+                        consensus.save()
 
                     if c.diagnosis:
                         cascade_diagnosis(patient.mr_no, c.diagnosis, request.user)
 
-                    write_audit_log(request.user, "APPROVE_CLINICAL", "tblClinicalDetails", patient.mr_no, f"MDTID generated: {new_mdt_id}")
-                    messages.success(request, f"Clinical details APPROVED! MDT ID generated: {new_mdt_id}")
+                    action_name = "SCHEDULE_MDT" if action == 'schedule_mdt' else "APPROVE_CLINICAL"
+                    write_audit_log(request.user, action_name, "tblClinicalDetails", patient.mr_no, f"MDTID generated: {new_mdt_id}")
+                    messages.success(
+                        request,
+                        f"MDT successfully scheduled for {c.date_mdt_planned.strftime('%d-%b-%Y')}! MDT ID: {new_mdt_id}. "
+                        f"Clinical details remain editable until 17:00 hrs on {c.date_mdt_planned.strftime('%d-%b-%Y')}."
+                    )
                     return redirect('clinical_edit', clinical_id=clinical.clinical_id)
     else:
         form = ClinicalDetailsForm(instance=clinical)
@@ -326,22 +399,90 @@ def clinical_edit(request, clinical_id):
     path_form = PathologyInvestigationForm(initial={'path_date': date.today()})
     mol_form = MolecularInvestigationForm(initial={'test_date': date.today()})
 
+    all_investigations = get_consolidated_investigations(clinical)
+
     context = {
         'form': form,
         'clinical': clinical,
         'patient': patient,
+        'lock_info': lock_info,
+        'is_editable': is_editable,
+        'is_locked': lock_info['is_locked'],
+        'is_scheduled': lock_info['is_scheduled'],
+        'is_admin': lock_info['is_admin'],
         'is_approved': is_approved,
         'blood_tests': clinical.blood_tests.all(),
         'imaging_tests': clinical.imaging_tests.all(),
         'pathology_tests': clinical.pathology_tests.all(),
         'molecular_tests': clinical.molecular_tests.all(),
+        'all_investigations': all_investigations,
         'blood_form': blood_form,
         'imaging_form': imaging_form,
         'path_form': path_form,
         'mol_form': mol_form,
         'discussion_purposes': DiscussionPurpose.objects.filter(is_active=True).order_by('display_order', 'name'),
+        'default_planned_date': (date.today() + timedelta(days=7)).strftime('%Y-%m-%d'),
     }
     return render(request, 'mdt/clinical_form.html', context)
+
+
+@login_required
+def clinical_reschedule(request, clinical_id):
+    """
+    Dedicated endpoint to re-schedule MDT date.
+    Accessible from Patient Details / History page as well as Clinical Form.
+    Updating the scheduled MDT date to today/future date reopens editing.
+    """
+    clinical = get_object_or_404(ClinicalDetails.objects.select_related('patient', 'consensus'), clinical_id=clinical_id)
+    patient = clinical.patient
+    next_url = request.POST.get('next_url') or request.GET.get('next') or (reverse('patient_search') + f"?mr={patient.mr_no}")
+
+    if request.method == 'POST':
+        new_date_str = request.POST.get('new_date') or request.POST.get('date_mdt_planned')
+        if not new_date_str:
+            messages.error(request, "Please provide a valid Planned MDT Date.")
+            return redirect(next_url)
+        try:
+            new_date = datetime.strptime(new_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, "Invalid date format.")
+            return redirect(next_url)
+
+        with transaction.atomic():
+            old_date = clinical.date_mdt_planned
+            clinical.date_mdt_planned = new_date
+            clinical.status = 'Scheduled'
+            if not clinical.mdt_id:
+                clinical.mdt_id = generate_next_mdt_id()
+                clinical.approved_by = request.user.username
+                clinical.approved_on = timezone.now()
+            clinical.save()
+
+            consensus, _ = MDTConsensus.objects.get_or_create(
+                clinical_details=clinical,
+                defaults={
+                    'mdt_id': clinical.mdt_id,
+                    'date_mdt_conducted': new_date,
+                    'status': 'Draft',
+                    'entered_by': request.user.username,
+                }
+            )
+            if consensus:
+                consensus.date_mdt_conducted = new_date
+                consensus.save()
+
+            write_audit_log(
+                request.user, "RESCHEDULE_MDT", "tblClinicalDetails", patient.mr_no,
+                f"Rescheduled MDT #{clinical.clinical_id} from {old_date} to {new_date}"
+            )
+            messages.success(
+                request,
+                f"MDT #{clinical.clinical_id} successfully re-scheduled to {new_date.strftime('%d-%b-%Y')}. "
+                f"Clinical presentation is now editable until 17:00 hrs on {new_date.strftime('%d-%b-%Y')}."
+            )
+            return redirect(next_url)
+
+    return redirect(next_url)
 
 
 # ==========================================
@@ -351,8 +492,13 @@ def clinical_edit(request, clinical_id):
 @login_required
 def investigation_add(request, clinical_id, inv_type):
     clinical = get_object_or_404(ClinicalDetails, clinical_id=clinical_id)
-    if clinical.status == 'Approved':
-        messages.error(request, "Cannot modify investigations for an Approved clinical record.")
+    lock_info = clinical.get_lock_status(request.user)
+    if not lock_info['can_edit']:
+        messages.error(
+            request,
+            f"Cannot modify investigations: Clinical presentation is locked (past 17:00 on {clinical.date_mdt_planned}). "
+            f"Re-schedule MDT to make edits."
+        )
         return redirect('clinical_edit', clinical_id=clinical_id)
 
     if request.method == 'POST':
@@ -393,12 +539,18 @@ def investigation_delete(request, inv_type, inv_id):
     else:
         return redirect('dashboard')
 
-    clinical_id = item.clinical_details.clinical_id
-    if item.clinical_details.status == 'Approved':
-        messages.error(request, "Cannot delete investigations from an Approved clinical record.")
+    clinical = item.clinical_details
+    clinical_id = clinical.clinical_id
+    lock_info = clinical.get_lock_status(request.user)
+    if not lock_info['can_edit']:
+        messages.error(
+            request,
+            f"Cannot delete investigations: Clinical presentation is locked (past 17:00 on {clinical.date_mdt_planned}). "
+            f"Re-schedule MDT to make edits."
+        )
         return redirect('clinical_edit', clinical_id=clinical_id)
 
-    mr = item.clinical_details.patient.mr_no
+    mr = clinical.patient.mr_no
     item.delete()
     write_audit_log(request.user, f"DELETE_{inv_type.upper()}", f"tbl{inv_type.capitalize()}", mr, f"Deleted ID: {inv_id}")
     messages.success(request, f"Investigation deleted successfully.")

@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.utils import timezone
+from django.urls import reverse
 from .models import MDTYearSequence, AuditLog, Patient, ClinicalDetails, MDTConsensus
 from datetime import date
 
@@ -81,57 +82,77 @@ def get_consolidated_investigations(clinical_details):
     """
     inv_list = []
     
-    for b in clinical_details.blood_tests.all():
+    for b in clinical_details.blood_tests.select_related('specimen_type').all():
         inv_list.append({
+            'id': b.id,
             'date': b.test_date,
             'category': 'Hematology / Biochemistry',
+            'category_short': 'Blood',
+            'badge_class': 'bg-danger-subtle text-danger border border-danger-subtle',
+            'icon': 'bi-droplet-fill',
             'type': b.specimen_type.name,
             'details': b.details,
-            'impression': b.impression or '—',
+            'impression': b.impression or '',
             'attachment': b.attachment,
             'obj': b,
-            'kind': 'blood'
+            'kind': 'blood',
+            'delete_url': reverse('investigation_delete', args=['blood', b.id]),
         })
         
-    for i in clinical_details.imaging_tests.all():
+    for i in clinical_details.imaging_tests.select_related('imaging_type', 'site').all():
         inv_list.append({
+            'id': i.id,
             'date': i.imaging_date,
             'category': 'Imaging / Radiology',
-            'type': f"{i.imaging_type.name} — {i.site.name}",
+            'category_short': 'Imaging',
+            'badge_class': 'bg-primary-subtle text-primary border border-primary-subtle',
+            'icon': 'bi-camera-fill',
+            'type': f"{i.imaging_type.name} • {i.site.name}",
             'details': i.details,
-            'impression': i.impression or '—',
+            'impression': i.impression or '',
             'attachment': i.attachment,
             'obj': i,
-            'kind': 'imaging'
+            'kind': 'imaging',
+            'delete_url': reverse('investigation_delete', args=['imaging', i.id]),
         })
         
-    for p in clinical_details.pathology_tests.all():
-        site_str = f" — {p.site_of_biopsy}" if p.site_of_biopsy else ""
+    for p in clinical_details.pathology_tests.select_related('specimen_type').all():
+        site_str = f" • {p.site_of_biopsy}" if p.site_of_biopsy else ""
         lab_str = f" [Ref: {p.lab_reference_no}]" if p.lab_reference_no else ""
         inv_list.append({
+            'id': p.id,
             'date': p.path_date,
             'category': 'Histopathology',
+            'category_short': 'Pathology',
+            'badge_class': 'bg-warning-subtle text-dark border border-warning-subtle',
+            'icon': 'bi-virus',
             'type': f"{p.specimen_type.name}{site_str}{lab_str}",
             'details': p.details,
-            'impression': p.impression or '—',
+            'impression': p.impression or '',
             'attachment': p.attachment,
             'obj': p,
-            'kind': 'pathology'
+            'kind': 'pathology',
+            'delete_url': reverse('investigation_delete', args=['pathology', p.id]),
         })
         
-    for m in clinical_details.molecular_tests.all():
+    for m in clinical_details.molecular_tests.select_related('test_type').all():
         lab_str = f" [Ref: {m.lab_reference_no}]" if m.lab_reference_no else ""
         inv_list.append({
+            'id': m.id,
             'date': m.test_date,
             'category': 'Molecular / Genetics',
+            'category_short': 'Molecular',
+            'badge_class': 'bg-info-subtle text-info-emphasis border border-info-subtle',
+            'icon': 'bi-dna',
             'type': f"{m.test_type.name}{lab_str}",
             'details': m.details,
-            'impression': m.impression or '—',
+            'impression': m.impression or '',
             'attachment': m.attachment,
             'obj': m,
-            'kind': 'molecular'
+            'kind': 'molecular',
+            'delete_url': reverse('investigation_delete', args=['molecular', m.id]),
         })
         
-    # Sort chronologically by date
-    inv_list.sort(key=lambda x: x['date'] or date.min)
+    # Sort chronologically by date, then id
+    inv_list.sort(key=lambda x: (x['date'] or date.min, x.get('id', 0)))
     return inv_list

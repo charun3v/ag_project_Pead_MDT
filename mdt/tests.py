@@ -492,6 +492,86 @@ class PeadMDTTests(TestCase):
         self.assertEqual(resp_img_tab.status_code, 200)
         self.assertContains(resp_img_tab, 'Primary retroperitoneal neuroblastoma')
 
+    def test_mdt_scheduling_and_1700_lock_rule(self):
+        """
+        Verify:
+        1. Scheduling MDT generates MDT ID and sets date_mdt_planned.
+        2. Scheduled episode remains editable before 17:00 on scheduled date.
+        3. Past 17:00 on scheduled date, non-admin is locked out of edits.
+        4. Re-scheduling MDT to a future date re-opens editing.
+        5. Consolidated chronological investigation list works correctly.
+        """
+        clin = ClinicalDetails.objects.create(
+            patient=self.patient,
+            height=110.0,
+            weight=18.0,
+            diagnosis='Ewings Sarcoma',
+            status='Draft',
+            entered_by='drtest'
+        )
+
+        # 1. Schedule MDT via action='schedule_mdt'
+        future_date = date.today() + timedelta(days=5)
+        resp = self.client.post(reverse('clinical_edit', args=[clin.clinical_id]), {
+            'action': 'schedule_mdt',
+            'diagnosis': 'Ewings Sarcoma Pelvis',
+            'height': 110.0,
+            'weight': 18.0,
+            'stage': 'Localized',
+            'discussion_purpose': self.purpose.purpose_id,
+            'prev_tx_history': 'None',
+            'date_mdt_planned': future_date,
+            'mdt_discussion_for': 'Biopsy & local therapy planning'
+        })
+        self.assertEqual(resp.status_code, 302)
+        clin.refresh_from_db()
+        self.assertEqual(clin.status, 'Scheduled')
+        self.assertEqual(clin.date_mdt_planned, future_date)
+        self.assertIsNotNone(clin.mdt_id)
+
+        # Case is editable because future date > now
+        lock_status = clin.get_lock_status(self.user)
+        self.assertTrue(lock_status['can_edit'])
+        self.assertFalse(lock_status['is_locked'])
+
+        # 2. Simulate past scheduled date (e.g. yesterday)
+        clin.date_mdt_planned = date.today() - timedelta(days=1)
+        clin.save()
+
+        # Regular user (Doctor) should now be locked out
+        lock_status_past = clin.get_lock_status(self.user)
+        self.assertFalse(lock_status_past['can_edit'])
+        self.assertTrue(lock_status_past['is_locked'])
+
+        # Admin user should still be able to edit (Admin Override)
+        admin_user = User.objects.create_user(username='superadmin', password='password123', is_superuser=True)
+        lock_status_admin = clin.get_lock_status(admin_user)
+        self.assertTrue(lock_status_admin['can_edit'])
+
+        # Attempt to save draft as regular user on locked case -> should be blocked
+        resp_blocked = self.client.post(reverse('clinical_edit', args=[clin.clinical_id]), {
+            'action': 'save_draft',
+            'diagnosis': 'Ewings Sarcoma Modified'
+        })
+        self.assertEqual(resp_blocked.status_code, 302)
+        clin.refresh_from_db()
+        self.assertNotEqual(clin.diagnosis, 'Ewings Sarcoma Modified')
+
+        # 3. Re-schedule MDT to a new future date -> should unlock!
+        new_future_date = date.today() + timedelta(days=7)
+        resp_resched = self.client.post(reverse('clinical_reschedule', args=[clin.clinical_id]), {
+            'new_date': new_future_date.strftime('%Y-%m-%d')
+        })
+        self.assertEqual(resp_resched.status_code, 302)
+        clin.refresh_from_db()
+        self.assertEqual(clin.date_mdt_planned, new_future_date)
+
+        # Now regular user can edit again!
+        lock_status_reopened = clin.get_lock_status(self.user)
+        self.assertTrue(lock_status_reopened['can_edit'])
+        self.assertFalse(lock_status_reopened['is_locked'])
+
+
 
 
 

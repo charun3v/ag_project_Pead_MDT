@@ -30,141 +30,160 @@
 <form method="post" id="clinicalForm">
   {% csrf_token %}
   
-  <div class="row g-2">
-    <!-- Left Column: Clinical Presentation Inputs -->
-    <div class="col-12 col-xl-7">
-      <div class="card card-clinical h-100">
-        <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
-          <strong><i class="bi bi-file-earmark-medical text-primary me-1"></i> Clinical Presentation & History</strong>
-          <span class="small text-muted">Episode #{{ clinical.clinical_id|default:"New" }}</span>
+  <!-- 1. Top Section: Clinical Presentation & History (Full Width) -->
+  <div class="card card-clinical mb-2">
+    <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+      <strong><i class="bi bi-file-earmark-medical text-primary me-1"></i> Clinical Presentation & History</strong>
+      <span class="small text-muted">Episode #{{ clinical.clinical_id|default:"New" }}</span>
+    </div>
+    <div class="card-body p-2">
+      
+      <!-- Locked Alert if Past 17:00 -->
+      {% if lock_info.is_locked %}
+      <div class="alert alert-warning py-2 px-3 small d-flex align-items-center justify-content-between mb-2">
+        <div>
+          <i class="bi bi-lock-fill text-danger me-1"></i>
+          <strong>Clinical Details Locked:</strong> This case was scheduled for MDT on <strong>{{ clinical.date_mdt_planned|date:"d-M-Y" }}</strong>. Editing closed at 17:00 hrs on that date.
+          {% if is_admin %}
+            <span class="badge bg-danger ms-1">Admin Override Active</span>
+          {% else %}
+            <span>Only Administrators can edit locked cases directly. Click <strong>Re-schedule MDT</strong> below to set a new date and reopen editing.</span>
+          {% endif %}
         </div>
-        <div class="card-body p-2">
-          
-          <!-- Diagnosis, Stage, Category -->
-          <div class="row g-2 mb-2">
-            <div class="col-12 col-md-6">
-              <label class="form-label-compact" for="{{ form.diagnosis.id_for_label }}">Current Episode Diagnosis *</label>
-              {{ form.diagnosis }}
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label-compact" for="{{ form.stage.id_for_label }}">Clinical Stage</label>
-              {{ form.stage }}
-            </div>
-            <div class="col-6 col-md-3">
-              <label class="form-label-compact" for="{{ form.date_mdt_planned.id_for_label }}">Planned MDT Date</label>
-              {{ form.date_mdt_planned }}
-            </div>
-          </div>
+        {% if not is_admin %}
+        <button type="button" class="btn btn-warning btn-sm py-0 px-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalRescheduleInline">
+          <i class="bi bi-calendar-event me-1"></i> Re-schedule MDT
+        </button>
+        {% endif %}
+      </div>
+      {% endif %}
 
-          <!-- Paediatric Vitals & Auto BSA / BMI Bar -->
-          <div class="p-2 mb-2 rounded bg-light border">
-            <div class="row g-2 align-items-center">
-              <div class="col-6 col-sm-3">
-                <label class="form-label-compact" for="{{ form.height.id_for_label }}">Height (cm)</label>
-                {{ form.height }}
-              </div>
-              <div class="col-6 col-sm-3">
-                <label class="form-label-compact" for="{{ form.weight.id_for_label }}">Weight (kg)</label>
-                {{ form.weight }}
-              </div>
-              <div class="col-6 col-sm-3">
-                <div class="form-label-compact text-primary fw-bold">Body Surface Area (BSA)</div>
-                <div class="badge bg-primary text-white p-2 d-block text-center fs-6" id="calc_bsa">
-                  {% if clinical.bsa %}{{ clinical.bsa }} m²{% else %}—{% endif %}
-                </div>
-              </div>
-              <div class="col-6 col-sm-3">
-                <div class="form-label-compact text-secondary fw-bold">Body Mass Index (BMI)</div>
-                <div class="badge bg-secondary text-white p-2 d-block text-center fs-6" id="calc_bmi">
-                  {% if clinical.bmi %}{{ clinical.bmi }} kg/m²{% else %}—{% endif %}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 1. Presenting Complaints & Physical Examination Findings -->
-          <div class="row g-2 mb-2">
-            <div class="col-12 col-md-6">
-              <label class="form-label-compact" for="{{ form.presenting_complaints.id_for_label }}">Presenting Complaints & History</label>
-              {{ form.presenting_complaints }}
-            </div>
-            <div class="col-12 col-md-6">
-              <label class="form-label-compact" for="{{ form.examination_findings.id_for_label }}">Physical & Systemic Findings</label>
-              {{ form.examination_findings }}
-            </div>
-          </div>
-
-          <!-- 2. Previous Treatment Details (Bigger Text Box) -->
-          <div class="mb-2">
-            <label class="form-label-compact" for="{{ form.prev_tx_history.id_for_label }}">Previous Treatment Details</label>
-            {{ form.prev_tx_history }}
-          </div>
-
-          <!-- 3. MDT Discussion Purpose (Reference Lookup) -->
-          <div class="mb-2">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <label class="form-label-compact mb-0" for="{{ form.discussion_purpose.id_for_label }}">MDT Discussion Purpose</label>
-              {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
-              <div class="d-flex gap-2 align-items-center">
-                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold text-primary" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalAddPurpose">
-                  <i class="bi bi-plus-circle me-1"></i> Add / Manage Purpose Options
-                </button>
-              </div>
-              {% endif %}
-            </div>
-            {{ form.discussion_purpose }}
-          </div>
-
-          <!-- 4. Specific Clinical Questions for MDT Panel -->
-          <div class="mb-2">
-            <label class="form-label-compact" for="{{ form.mdt_discussion_for.id_for_label }}">Specific Clinical Questions for MDT Panel</label>
-            {{ form.mdt_discussion_for }}
-          </div>
-
-          <!-- Clinical Action Buttons (Directly below clinical data) -->
-          <div class="d-flex align-items-center justify-content-between p-2 mt-3 rounded bg-light border">
-            <div class="text-secondary small fw-semibold">
-              {% if clinical.clinical_id %}
-                <span>Episode #{{ clinical.clinical_id }} &bull; Status: <strong class="{% if is_approved %}text-success{% else %}text-warning-emphasis{% endif %}">{{ clinical.status }}</strong></span>
-              {% else %}
-                <span>New Clinical Presentation Draft</span>
-              {% endif %}
-            </div>
-            <div class="d-flex gap-2">
-              {% if not is_approved %}
-                <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary btn-sm px-3 fw-bold">
-                  <i class="bi bi-save me-1"></i> Save Draft
-                </button>
-                
-                {% if not is_new %}
-                <button type="button" class="btn btn-success btn-sm px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#modalConfirmApproval">
-                  <i class="bi bi-check2-circle me-1"></i> Approve Clinical Details
-                </button>
-                {% endif %}
-              {% else %}
-                <span class="badge badge-approved p-2 d-flex align-items-center">
-                  <i class="bi bi-lock-fill me-1"></i> Approved by {{ clinical.approved_by }}
-                </span>
-              {% endif %}
-            </div>
-          </div>
-
+      <!-- Diagnosis & Stage -->
+      <div class="row g-2 mb-2">
+        <div class="col-12 col-md-8">
+          <label class="form-label-compact" for="{{ form.diagnosis.id_for_label }}">Current Episode Diagnosis *</label>
+          {{ form.diagnosis }}
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label-compact" for="{{ form.stage.id_for_label }}">Clinical Stage</label>
+          {{ form.stage }}
         </div>
       </div>
-    </div>
 
-    <!-- Right Column: Multi-Modality Diagnostic Investigations -->
-    <div class="col-12 col-xl-5">
+      <!-- Paediatric Vitals & Auto BSA / BMI Bar -->
+      <div class="p-2 mb-2 rounded bg-light border">
+        <div class="row g-2 align-items-center">
+          <div class="col-6 col-sm-3">
+            <label class="form-label-compact" for="{{ form.height.id_for_label }}">Height (cm)</label>
+            {{ form.height }}
+          </div>
+          <div class="col-6 col-sm-3">
+            <label class="form-label-compact" for="{{ form.weight.id_for_label }}">Weight (kg)</label>
+            {{ form.weight }}
+          </div>
+          <div class="col-6 col-sm-3">
+            <div class="form-label-compact text-primary fw-bold">Body Surface Area (BSA)</div>
+            <div class="badge bg-primary text-white p-2 d-block text-center fs-6" id="calc_bsa">
+              {% if clinical.bsa %}{{ clinical.bsa }} m²{% else %}—{% endif %}
+            </div>
+          </div>
+          <div class="col-6 col-sm-3">
+            <div class="form-label-compact text-secondary fw-bold">Body Mass Index (BMI)</div>
+            <div class="badge bg-secondary text-white p-2 d-block text-center fs-6" id="calc_bmi">
+              {% if clinical.bmi %}{{ clinical.bmi }} kg/m²{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1. Presenting Complaints & Physical Examination Findings -->
+      <div class="row g-2 mb-2">
+        <div class="col-12 col-md-6">
+          <label class="form-label-compact" for="{{ form.presenting_complaints.id_for_label }}">Presenting Complaints & History</label>
+          {{ form.presenting_complaints }}
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label-compact" for="{{ form.examination_findings.id_for_label }}">Physical & Systemic Findings</label>
+          {{ form.examination_findings }}
+        </div>
+      </div>
+
+      <!-- 2. Previous Treatment Details (Bigger Text Box) -->
+      <div class="mb-2">
+        <label class="form-label-compact" for="{{ form.prev_tx_history.id_for_label }}">Previous Treatment Details</label>
+        {{ form.prev_tx_history }}
+      </div>
+
+      <!-- 3. MDT Discussion Purpose (Reference Lookup) -->
+      <div class="mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <label class="form-label-compact mb-0" for="{{ form.discussion_purpose.id_for_label }}">MDT Discussion Purpose</label>
+          {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
+          <div class="d-flex gap-2 align-items-center">
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold text-primary" style="font-size: 0.75rem;" data-bs-toggle="modal" data-bs-target="#modalAddPurpose">
+              <i class="bi bi-plus-circle me-1"></i> Add / Manage Purpose Options
+            </button>
+          </div>
+          {% endif %}
+        </div>
+        {{ form.discussion_purpose }}
+      </div>
+
+      <!-- 4. Specific Clinical Questions for MDT Panel -->
+      <div class="mb-2">
+        <label class="form-label-compact" for="{{ form.mdt_discussion_for.id_for_label }}">Specific Clinical Questions for MDT Panel</label>
+        {{ form.mdt_discussion_for }}
+      </div>
+
+      <!-- Clinical Action Bar (Directly below clinical data) -->
+      <div class="d-flex align-items-center justify-content-between p-2 mt-2 rounded bg-light border">
+        <div class="text-secondary small fw-semibold">
+          {% if clinical.clinical_id %}
+            <span>Episode #{{ clinical.clinical_id }} &bull; Status: 
+              {% if lock_info.is_scheduled %}
+                {% if lock_info.deadline_passed %}
+                  <span class="badge bg-danger text-white"><i class="bi bi-lock-fill me-1"></i>Locked (17:00 passed)</span>
+                {% else %}
+                  <span class="badge bg-primary text-white"><i class="bi bi-clock-history me-1"></i>Scheduled (Editable till 17:00)</span>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-secondary text-white"><i class="bi bi-pencil me-1"></i>Draft</span>
+              {% endif %}
+            </span>
+          {% else %}
+            <span>New Clinical Presentation Draft</span>
+          {% endif %}
+        </div>
+        <div class="d-flex gap-2">
+          {% if is_editable %}
+            <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary btn-sm px-3 fw-bold shadow-sm">
+              <i class="bi bi-save me-1"></i> Save Draft
+            </button>
+          {% else %}
+            <button type="button" class="btn btn-outline-secondary btn-sm px-3" disabled title="Clinical data is locked after 17:00 on {{ clinical.date_mdt_planned|date:'d-M-Y' }}">
+              <i class="bi bi-lock-fill me-1"></i> Save Draft (Locked)
+            </button>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 2. Middle Section: Diagnostic Investigations Hub (Below Clinical Data) -->
+  <div class="row g-2 mb-2">
+    <!-- Left Half: Investigations Hub & Entry by Category -->
+    <div class="col-12 col-lg-6">
       <div class="card card-clinical h-100">
         <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
-          <strong><i class="bi bi-diagram-3 text-primary me-1"></i> Diagnostic Investigations</strong>
+          <strong><i class="bi bi-diagram-3 text-primary me-1"></i> Diagnostic Investigations Hub</strong>
           <div class="d-flex align-items-center gap-2">
             {% if not is_new %}
             <a href="{% url 'investigations_hub' clinical.clinical_id %}" class="btn btn-outline-primary btn-sm py-0 px-2 fw-semibold" style="font-size: 0.75rem;">
               <i class="bi bi-box-arrow-up-right me-1"></i> Full Hub
             </a>
             {% endif %}
-            <small class="text-muted">4 Categories</small>
+            <small class="text-muted">4 Modalities</small>
           </div>
         </div>
         <div class="card-body p-2">
@@ -178,22 +197,22 @@
           <ul class="nav nav-tabs nav-tabs-clinical" id="invTabs" role="tablist">
             <li class="nav-item">
               <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabBlood" type="button">
-                Blood / Chem ({{ blood_tests|length }})
+                🩸 Blood ({{ blood_tests|length }})
               </button>
             </li>
             <li class="nav-item">
               <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabImaging" type="button">
-                Imaging ({{ imaging_tests|length }})
+                🩻 Imaging ({{ imaging_tests|length }})
               </button>
             </li>
             <li class="nav-item">
               <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPathology" type="button">
-                Pathology ({{ pathology_tests|length }})
+                🔬 Pathology ({{ pathology_tests|length }})
               </button>
             </li>
             <li class="nav-item">
               <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMolecular" type="button">
-                Molecular ({{ molecular_tests|length }})
+                🧬 Molecular ({{ molecular_tests|length }})
               </button>
             </li>
           </ul>
@@ -203,16 +222,16 @@
             <div class="tab-pane fade show active" id="tabBlood" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="small fw-semibold text-muted">Hematology, LFT, KFT, Fluids</span>
-                {% if not is_approved %}
+                {% if is_editable %}
                 <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalBlood">
                   <i class="bi bi-plus-lg me-1"></i> Add Blood
                 </button>
                 {% endif %}
               </div>
-              <div class="table-responsive" style="max-height: 220px;">
+              <div class="table-responsive" style="max-height: 260px;">
                 <table class="table table-compact table-bordered mb-0">
                   <thead class="bg-light">
-                    <tr><th>Date</th><th>Specimen</th><th>Impression / Findings</th><th class="text-end">#</th></tr>
+                    <tr><th>Date</th><th>Specimen</th><th>Impression / Findings</th>{% if is_editable %}<th class="text-end">#</th>{% endif %}</tr>
                   </thead>
                   <tbody>
                     {% for b in blood_tests %}
@@ -225,11 +244,11 @@
                         <a href="{{ b.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> File</a>
                         {% endif %}
                       </td>
+                      {% if is_editable %}
                       <td class="text-end">
-                        {% if not is_approved %}
                         <a href="{% url 'investigation_delete' 'blood' b.id %}" class="text-danger small" onclick="return confirm('Delete this test?');"><i class="bi bi-trash"></i></a>
-                        {% endif %}
                       </td>
+                      {% endif %}
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="text-center text-muted py-2 small">No blood tests recorded.</td></tr>
@@ -243,16 +262,16 @@
             <div class="tab-pane fade" id="tabImaging" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="small fw-semibold text-muted">CT, MRI, PET, USG, Scans</span>
-                {% if not is_approved %}
+                {% if is_editable %}
                 <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalImaging">
                   <i class="bi bi-plus-lg me-1"></i> Add Imaging
                 </button>
                 {% endif %}
               </div>
-              <div class="table-responsive" style="max-height: 220px;">
+              <div class="table-responsive" style="max-height: 260px;">
                 <table class="table table-compact table-bordered mb-0">
                   <thead class="bg-light">
-                    <tr><th>Date</th><th>Modality & Site</th><th>Impression</th><th class="text-end">#</th></tr>
+                    <tr><th>Date</th><th>Modality & Site</th><th>Impression *</th>{% if is_editable %}<th class="text-end">#</th>{% endif %}</tr>
                   </thead>
                   <tbody>
                     {% for i in imaging_tests %}
@@ -260,16 +279,17 @@
                       <td class="text-nowrap">{{ i.imaging_date|date:"d-M-y" }}</td>
                       <td><strong>{{ i.imaging_type.name }}</strong> &bull; {{ i.site.name }}</td>
                       <td>
-                        <small>{{ i.impression|default:i.details }}</small>
+                        <div class="small fw-semibold text-dark">{{ i.impression }}</div>
+                        {% if i.details %}<small class="text-muted d-block">{{ i.details|truncatechars:100 }}</small>{% endif %}
                         {% if i.attachment %}
-                        <a href="{{ i.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> Image</a>
+                        <a href="{{ i.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none mt-1"><i class="bi bi-paperclip"></i> Image</a>
                         {% endif %}
                       </td>
+                      {% if is_editable %}
                       <td class="text-end">
-                        {% if not is_approved %}
                         <a href="{% url 'investigation_delete' 'imaging' i.id %}" class="text-danger small" onclick="return confirm('Delete this scan?');"><i class="bi bi-trash"></i></a>
-                        {% endif %}
                       </td>
+                      {% endif %}
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="text-center text-muted py-2 small">No imaging recorded.</td></tr>
@@ -283,16 +303,16 @@
             <div class="tab-pane fade" id="tabPathology" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="small fw-semibold text-muted">Histopathology, IHC, Biopsies</span>
-                {% if not is_approved %}
+                {% if is_editable %}
                 <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalPathology">
                   <i class="bi bi-plus-lg me-1"></i> Add Pathology
                 </button>
                 {% endif %}
               </div>
-              <div class="table-responsive" style="max-height: 220px;">
+              <div class="table-responsive" style="max-height: 260px;">
                 <table class="table table-compact table-bordered mb-0">
                   <thead class="bg-light">
-                    <tr><th>Date</th><th>Type / Ref</th><th>Diagnosis / Impression</th><th class="text-end">#</th></tr>
+                    <tr><th>Date</th><th>Type / Ref</th><th>Diagnosis / Impression</th>{% if is_editable %}<th class="text-end">#</th>{% endif %}</tr>
                   </thead>
                   <tbody>
                     {% for p in pathology_tests %}
@@ -308,11 +328,11 @@
                         <a href="{{ p.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> Report</a>
                         {% endif %}
                       </td>
+                      {% if is_editable %}
                       <td class="text-end">
-                        {% if not is_approved %}
                         <a href="{% url 'investigation_delete' 'pathology' p.id %}" class="text-danger small" onclick="return confirm('Delete this report?');"><i class="bi bi-trash"></i></a>
-                        {% endif %}
                       </td>
+                      {% endif %}
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="text-center text-muted py-2 small">No pathology recorded.</td></tr>
@@ -326,16 +346,16 @@
             <div class="tab-pane fade" id="tabMolecular" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="small fw-semibold text-muted">FISH, NGS, Cytogenetics</span>
-                {% if not is_approved %}
+                {% if is_editable %}
                 <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalMolecular">
                   <i class="bi bi-plus-lg me-1"></i> Add Molecular
                 </button>
                 {% endif %}
               </div>
-              <div class="table-responsive" style="max-height: 220px;">
+              <div class="table-responsive" style="max-height: 260px;">
                 <table class="table table-compact table-bordered mb-0">
                   <thead class="bg-light">
-                    <tr><th>Date</th><th>Panel / Test</th><th>Genomic Aberrations</th><th class="text-end">#</th></tr>
+                    <tr><th>Date</th><th>Panel / Test</th><th>Genomic Aberrations</th>{% if is_editable %}<th class="text-end">#</th>{% endif %}</tr>
                   </thead>
                   <tbody>
                     {% for m in molecular_tests %}
@@ -348,11 +368,11 @@
                         <a href="{{ m.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none ms-1"><i class="bi bi-paperclip"></i> Panel</a>
                         {% endif %}
                       </td>
+                      {% if is_editable %}
                       <td class="text-end">
-                        {% if not is_approved %}
                         <a href="{% url 'investigation_delete' 'molecular' m.id %}" class="text-danger small" onclick="return confirm('Delete this test?');"><i class="bi bi-trash"></i></a>
-                        {% endif %}
                       </td>
+                      {% endif %}
                     </tr>
                     {% empty %}
                     <tr><td colspan="4" class="text-center text-muted py-2 small">No molecular tests recorded.</td></tr>
@@ -364,6 +384,148 @@
           </div>
           {% endif %}
 
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Half: All Added Investigations in Chronological Order -->
+    <div class="col-12 col-lg-6">
+      <div class="card card-clinical h-100">
+        <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
+          <strong><i class="bi bi-clock-history text-primary me-1"></i> Added Investigations (Chronological Order)</strong>
+          <span class="badge bg-primary rounded-pill">{{ all_investigations|length }} Total</span>
+        </div>
+        <div class="card-body p-2">
+          
+          <div class="table-responsive" style="max-height: 310px; overflow-y: auto;">
+            <table class="table table-compact table-hover align-middle mb-0">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th style="width: 85px;">Date</th>
+                  <th style="width: 90px;">Modality</th>
+                  <th>Test & Findings / Impression</th>
+                  <th style="width: 65px;" class="text-center">File</th>
+                  {% if is_editable %}
+                  <th style="width: 35px;" class="text-end">#</th>
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for inv in all_investigations %}
+                <tr>
+                  <td class="text-nowrap fw-semibold small">
+                    {{ inv.date|date:"d-M-y" }}
+                  </td>
+                  <td>
+                    <span class="badge {{ inv.badge_class }} d-inline-flex align-items-center px-2 py-1">
+                      <i class="bi {{ inv.icon }} me-1"></i>{{ inv.category_short }}
+                    </span>
+                  </td>
+                  <td>
+                    <strong class="text-dark small d-block">{{ inv.type }}</strong>
+                    {% if inv.impression %}
+                    <div class="small p-1 px-2 rounded mt-1" style="background-color: rgba(220, 53, 69, 0.06); border-left: 3px solid #dc3545;">
+                      <strong class="text-danger">Impression:</strong> {{ inv.impression }}
+                    </div>
+                    {% endif %}
+                    {% if inv.details %}
+                    <div class="text-muted small text-truncate mt-1" style="max-width: 300px;" title="{{ inv.details }}">
+                      {{ inv.details }}
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if inv.attachment %}
+                    <a href="{{ inv.attachment.url }}" target="_blank" class="badge bg-light text-primary border text-decoration-none py-1 px-2" title="View attached document">
+                      <i class="bi bi-paperclip"></i> View
+                    </a>
+                    {% else %}
+                    <span class="text-muted small">—</span>
+                    {% endif %}
+                  </td>
+                  {% if is_editable %}
+                  <td class="text-end">
+                    <a href="{{ inv.delete_url }}" class="text-danger small" onclick="return confirm('Delete this record?');" title="Delete">
+                      <i class="bi bi-trash"></i>
+                    </a>
+                  </td>
+                  {% endif %}
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4 small">
+                    <i class="bi bi-inbox fs-4 d-block text-muted mb-1"></i>
+                    No investigations attached to this episode yet.<br>
+                    <span class="text-secondary">Use the tabs on the left to add Blood, Imaging, Pathology, or Molecular reports.</span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Bottom Scheduling Section: MDT planned on: -> [ Schedule MDT ] -->
+  <div class="card card-clinical mt-2 mb-2 border-primary shadow-sm">
+    <div class="card-body py-2 px-3">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <!-- Left: Date Picker and Schedule Button -->
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <label for="id_date_mdt_planned" class="fw-bold text-dark mb-0 fs-6">
+            <i class="bi bi-calendar-event text-primary me-1"></i> MDT planned on:
+          </label>
+          <input type="date" name="date_mdt_planned" id="id_date_mdt_planned" 
+                 class="form-control form-control-sm d-inline-block fw-semibold" style="width: 175px;"
+                 value="{{ clinical.date_mdt_planned|date:'Y-m-d'|default:default_planned_date }}"
+                 {% if not is_editable and not is_admin %}disabled{% endif %} required>
+          
+          {% if not clinical.date_mdt_planned or clinical.status == 'Draft' %}
+            <button type="submit" name="action" value="schedule_mdt" class="btn btn-success btn-sm px-3 fw-bold shadow-sm">
+              <i class="bi bi-calendar-check me-1"></i> Schedule MDT
+            </button>
+          {% else %}
+            {% if is_editable %}
+              <button type="submit" name="action" value="schedule_mdt" class="btn btn-primary btn-sm px-3 fw-bold shadow-sm">
+                <i class="bi bi-arrow-repeat me-1"></i> Update MDT Schedule
+              </button>
+            {% else %}
+              <button type="button" class="btn btn-warning btn-sm px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRescheduleInline">
+                <i class="bi bi-calendar-plus me-1"></i> Re-schedule MDT
+              </button>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        <!-- Right: Status Badge & Links -->
+        <div class="d-flex align-items-center gap-2">
+          {% if clinical.date_mdt_planned and clinical.status != 'Draft' %}
+            {% if lock_info.deadline_passed %}
+              <span class="badge bg-danger p-2 text-white d-flex align-items-center" title="Editing closed at 17:00 hrs on {{ clinical.date_mdt_planned|date:'d-M-Y' }}">
+                <i class="bi bi-lock-fill me-1"></i> Locked (Past 17:00 on {{ clinical.date_mdt_planned|date:'d-M-Y' }})
+              </span>
+            {% else %}
+              <span class="badge bg-success p-2 text-white d-flex align-items-center" title="Clinical details editable until 17:00">
+                <i class="bi bi-clock-history me-1"></i> Scheduled (Editable until {{ clinical.date_mdt_planned|date:'d-M-Y' }} 17:00)
+              </span>
+            {% endif %}
+          {% else %}
+            <span class="badge bg-secondary p-2 text-white">
+              <i class="bi bi-hourglass me-1"></i> Unscheduled Draft
+            </span>
+          {% endif %}
+
+          {% if clinical.consensus %}
+            <a href="{% url 'consensus_edit' clinical.consensus.consensus_id %}" class="btn btn-outline-primary btn-sm px-3 fw-semibold">
+              <i class="bi bi-chat-square-text me-1"></i> Proceed to MDT Discussion
+            </a>
+            <a href="{% url 'live_presentation' clinical.consensus.consensus_id %}" class="btn btn-info btn-sm px-2 text-white fw-semibold">
+              <i class="bi bi-tv me-1"></i> Live Presentation
+            </a>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -391,20 +553,63 @@
       <div class="d-flex gap-2 mt-2 mt-md-0">
         {% if clinical.clinical_id %}
         <a href="{% url 'investigations_hub' clinical.clinical_id %}" class="btn btn-outline-primary btn-sm px-3 fw-semibold">
-          <i class="bi bi-diagram-3 me-1"></i> Investigations Hub
-        </a>
-        {% endif %}
-        {% if is_approved and clinical.consensus %}
-        <a href="{% url 'consensus_edit' clinical.consensus.consensus_id %}" class="btn btn-primary btn-sm px-3 fw-semibold">
-          <i class="bi bi-chat-square-text me-1"></i> Proceed to MDT Discussion
-        </a>
-        <a href="{% url 'live_presentation' clinical.consensus.consensus_id %}" class="btn btn-info btn-sm px-3 fw-semibold text-white">
-          <i class="bi bi-easel2 me-1"></i> Live Presentation
+          <i class="bi bi-diagram-3 me-1"></i> Full Investigations Hub
         </a>
         {% endif %}
       </div>
     </div>
   </div>
+
+  <!-- Modal: Inline Re-schedule MDT (when case is locked) -->
+  {% if clinical.clinical_id %}
+  <div class="modal fade" id="modalRescheduleInline" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content">
+        <div class="modal-header bg-warning text-dark py-2">
+          <h6 class="modal-title small fw-bold mb-0">
+            <i class="bi bi-calendar-event me-1"></i> Re-schedule MDT Date
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-3">
+          <p class="small text-muted mb-2">
+            Current Scheduled Date: <strong>{{ clinical.date_mdt_planned|date:"d-M-Y"|default:"Not scheduled" }}</strong>
+          </p>
+          <div class="alert alert-info py-1 px-2 small mb-2">
+            <i class="bi bi-info-circle me-1"></i> Setting a new date will unlock and reopen editing for all clinical details and investigations until 17:00 hrs on that date.
+          </div>
+          <label class="form-label small fw-bold">New Planned MDT Date *</label>
+          <input type="date" id="inline_new_date" class="form-control form-control-sm" value="{{ default_planned_date }}" required>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="applyInlineReschedule()">Confirm Reschedule</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    function applyInlineReschedule() {
+      var newDate = document.getElementById('inline_new_date').value;
+      if (!newDate) {
+        alert('Please choose a valid date.');
+        return;
+      }
+      var dateInput = document.getElementById('id_date_mdt_planned');
+      if (dateInput) {
+        dateInput.disabled = false;
+        dateInput.value = newDate;
+      }
+      var form = document.getElementById('clinicalForm');
+      var hiddenAction = document.createElement('input');
+      hiddenAction.type = 'hidden';
+      hiddenAction.name = 'action';
+      hiddenAction.value = 'reschedule_mdt';
+      form.appendChild(hiddenAction);
+      form.submit();
+    }
+  </script>
+  {% endif %}
 
   <!-- Modal: Confirm Approval -->
   {% if not is_approved and not is_new %}
@@ -439,8 +644,8 @@
   {% endif %}
 </form>
 
-<!-- Investigation Add Modals (Only rendered when record exists & not approved) -->
-{% if not is_new and not is_approved %}
+<!-- Investigation Add Modals (Rendered when record exists and is editable) -->
+{% if not is_new and is_editable %}
 <!-- Modal: Add Blood -->
 <div class="modal fade" id="modalBlood" tabindex="-1">
   <div class="modal-dialog">

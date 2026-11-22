@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 import math
-from datetime import date
+from datetime import date, datetime, time
 
 
 # ==========================================
@@ -249,6 +249,7 @@ class Patient(models.Model):
 class ClinicalDetails(models.Model):
     STATUS_CHOICES = [
         ('Draft', 'Draft'),
+        ('Scheduled', 'Scheduled'),
         ('Approved', 'Approved'),
     ]
     DISCUSSION_CHOICES = [
@@ -313,7 +314,82 @@ class ClinicalDetails(models.Model):
 
     @property
     def is_approved(self):
-        return self.status == 'Approved'
+        return self.status in ['Approved', 'Scheduled']
+
+    @property
+    def is_scheduled(self):
+        return (self.status in ['Scheduled', 'Approved']) and bool(self.date_mdt_planned)
+
+    @property
+    def is_locked_1700(self):
+        """
+        True if date_mdt_planned is scheduled and current local time has passed 17:00 on that date.
+        """
+        if not self.date_mdt_planned or self.status == 'Draft':
+            return False
+        tz = timezone.get_current_timezone()
+        deadline = timezone.make_aware(
+            datetime.combine(self.date_mdt_planned, time(17, 0, 0)),
+            tz
+        )
+        return timezone.localtime() > deadline
+
+    def get_lock_status(self, user=None):
+        """
+        Institutional MDT Lock Status:
+        - Once scheduled, clinical details remain editable until 17:00 hrs on the day of date_mdt_planned.
+        - After 17:00 on that date, it becomes non-editable for all users except Admin / SubAdmin.
+        - The only way to make it editable is to re-schedule MDT to a new date.
+        """
+        is_admin = False
+        if user:
+            if getattr(user, 'is_superuser', False):
+                is_admin = True
+            profile = getattr(user, 'profile', None)
+            if profile and profile.role in ['Admin', 'SubAdmin']:
+                is_admin = True
+
+        if not self.date_mdt_planned or self.status == 'Draft':
+            return {
+                'is_scheduled': False,
+                'is_locked': False,
+                'is_admin': is_admin,
+                'can_edit': True,
+                'deadline_passed': False,
+                'deadline': None,
+                'badge_text': 'Draft',
+                'badge_class': 'badge-draft',
+            }
+
+        tz = timezone.get_current_timezone()
+        deadline = timezone.make_aware(
+            datetime.combine(self.date_mdt_planned, time(17, 0, 0)),
+            tz
+        )
+        now = timezone.localtime()
+        deadline_passed = now > deadline
+
+        if deadline_passed:
+            can_edit = is_admin
+            is_locked = not is_admin
+            badge_text = 'Locked (17:00 passed)'
+            badge_class = 'bg-danger text-white'
+        else:
+            can_edit = True
+            is_locked = False
+            badge_text = f'Scheduled (Editable till {self.date_mdt_planned.strftime("%d-%b")} 17:00)'
+            badge_class = 'bg-primary text-white'
+
+        return {
+            'is_scheduled': True,
+            'is_locked': is_locked,
+            'is_admin': is_admin,
+            'can_edit': can_edit,
+            'deadline_passed': deadline_passed,
+            'deadline': deadline,
+            'badge_text': badge_text,
+            'badge_class': badge_class,
+        }
 
 
 # ==========================================
@@ -323,6 +399,7 @@ class ClinicalDetails(models.Model):
 class MDTConsensus(models.Model):
     STATUS_CHOICES = [
         ('Draft', 'Draft'),
+        ('Scheduled', 'Scheduled'),
         ('Approved', 'Approved'),
     ]
 

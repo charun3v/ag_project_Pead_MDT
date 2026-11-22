@@ -16,6 +16,7 @@ urlpatterns = [
     # Clinical Presentation URLs
     path('clinical/new/<str:mr_no>/', views.clinical_create, name='clinical_create'),
     path('clinical/<int:clinical_id>/', views.clinical_edit, name='clinical_edit'),
+    path('clinical/<int:clinical_id>/reschedule/', views.clinical_reschedule, name='clinical_reschedule'),
     path('clinical/<int:clinical_id>/delete/', views.clinical_delete_view, name='clinical_delete'),
     path('clinical/<int:clinical_id>/inv/add/<str:inv_type>/', views.investigation_add, name='investigation_add'),
     path('investigation/delete/<str:inv_type>/<int:inv_id>/', views.investigation_delete, name='investigation_delete'),

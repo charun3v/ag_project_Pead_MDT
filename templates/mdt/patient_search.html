@@ -127,11 +127,19 @@
               {% endif %}
             </td>
             <td>
-              {% if ep.status == 'Approved' %}
-                <span class="badge badge-approved"><i class="bi bi-check2-circle me-1"></i>Approved</span>
-              {% else %}
-                <span class="badge badge-draft"><i class="bi bi-pencil me-1"></i>Draft</span>
-              {% endif %}
+              {% with lock=ep.get_lock_status %}
+                {% if not lock.is_scheduled %}
+                  <span class="badge bg-secondary text-white"><i class="bi bi-pencil me-1"></i>Draft</span>
+                {% elif lock.deadline_passed %}
+                  <span class="badge bg-danger text-white" title="Locked after 17:00 on {{ ep.date_mdt_planned|date:'d-M-Y' }}">
+                    <i class="bi bi-lock-fill me-1"></i>Locked (17:00 passed)
+                  </span>
+                {% else %}
+                  <span class="badge bg-primary text-white" title="Editable until 17:00 on {{ ep.date_mdt_planned|date:'d-M-Y' }}">
+                    <i class="bi bi-clock-history me-1"></i>Scheduled (Editable till 17:00)
+                  </span>
+                {% endif %}
+              {% endwith %}
             </td>
             <td>
               {% if ep.mdt_id %}
@@ -162,6 +170,11 @@
               <a href="{% url 'clinical_edit' ep.clinical_id %}" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Clinical Form & Investigations">
                 <i class="bi bi-file-earmark-medical me-1"></i> Clinical
               </a>
+              {% if ep.date_mdt_planned %}
+              <button type="button" class="btn btn-outline-warning btn-sm py-0 px-2" data-bs-toggle="modal" data-bs-target="#modalReschedule{{ ep.clinical_id }}" title="Re-schedule MDT Date">
+                <i class="bi bi-calendar-event me-1"></i> Re-schedule
+              </button>
+              {% endif %}
               {% if ep.consensus %}
               <a href="{% url 'consensus_edit' ep.consensus.consensus_id %}" class="btn btn-outline-primary btn-sm py-0 px-2" title="MDT Consensus Form">
                 <i class="bi bi-chat-square-text me-1"></i> MDT
@@ -195,6 +208,44 @@
     </div>
   </div>
 </div>
+
+<!-- Reschedule MDT Modals for Patient History -->
+{% for ep in patient_history %}
+{% if ep.date_mdt_planned %}
+<div class="modal fade" id="modalReschedule{{ ep.clinical_id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <form method="post" action="{% url 'clinical_reschedule' ep.clinical_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="next_url" value="{% url 'patient_search' %}?mr={{ patient.mr_no }}">
+        <div class="modal-header bg-warning text-dark py-2">
+          <h6 class="modal-title small fw-bold mb-0">
+            <i class="bi bi-calendar-event me-1"></i> Re-schedule MDT #{{ ep.clinical_id }}
+          </h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body py-3">
+          <p class="small text-muted mb-2">
+            Currently scheduled for: <strong>{{ ep.date_mdt_planned|date:"d-M-Y" }}</strong>
+          </p>
+          {% if ep.is_locked_1700 %}
+          <div class="alert alert-danger py-1 px-2 small mb-2">
+            <i class="bi bi-lock-fill me-1"></i> 17:00 hrs deadline passed (Locked). Selecting a new date will re-open editing.
+          </div>
+          {% endif %}
+          <label class="form-label small fw-bold">New Planned MDT Date *</label>
+          <input type="date" name="new_date" class="form-control form-control-sm" value="{{ ep.date_mdt_planned|date:'Y-m-d' }}" required>
+        </div>
+        <div class="modal-footer py-1">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm fw-bold">Confirm Reschedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
 {% elif query and not patient_matches %}
 <div class="alert alert-light border text-center py-4 text-muted">
   <i class="bi bi-search fs-3 d-block mb-2"></i>
