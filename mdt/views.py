@@ -25,6 +25,7 @@ from .forms import (
 from .services import (
     generate_next_mdt_id, write_audit_log, cascade_diagnosis, get_consolidated_investigations
 )
+from .lookup_config import LOOKUP_CONFIG, get_lookup_config
 
 
 def is_admin_user(user):
@@ -1359,4 +1360,364 @@ def export_all_zip_view(request):
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     write_audit_log(request.user, "EXPORT_DATA", "ALL_TABLES", filename, "Exported complete database ZIP archive")
     return response
+
+
+# ==========================================
+# Scheduler-Style Centralized Dropdown & Lookup Tables Manager (Admin / SubAdmin)
+# ==========================================
+
+@login_required
+def lookup_manager_view(request, category='purpose'):
+    """
+    Centralized Reference Table & Dropdown Manager replicating Patient Scheduler database design.
+    Allows Admins to manage and reorder Discussion Purposes, Sites, Modalities, Specimens, etc.
+    """
+    if not is_admin_user(request.user):
+        messages.error(request, "Access denied: Dropdown management requires Administrator privileges.")
+        return redirect('dashboard')
+
+    if category not in LOOKUP_CONFIG:
+        category = 'purpose'
+
+    cfg = get_lookup_config(category)
+    model = cfg['model']
+    pk_field = cfg['pk']
+    name_field = cfg['name_field']
+
+    items = model.objects.all().order_by('display_order', name_field)
+    processed_items = []
+    for it in items:
+        processed_items.append({
+            'pk': getattr(it, pk_field),
+            'name': getattr(it, name_field),
+            'display_order': getattr(it, 'display_order', 0),
+            'is_active': getattr(it, 'is_active', True),
+        })
+
+    context = {
+        'category': category,
+        'cfg': cfg,
+        'items': processed_items,
+        'lookup_categories': LOOKUP_CONFIG,
+    }
+    return render(request, 'mdt/lookup_manager.html', context)
+
+
+@login_required
+def lookup_add_view(request, category):
+    if not is_admin_user(request.user):
+        messages.error(request, "Access denied: Administrators only.")
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        cfg = get_lookup_config(category)
+        model = cfg['model']
+        name_field = cfg['name_field']
+
+        name_val = request.POST.get('name_value', '').strip()
+        display_order = request.POST.get('display_order', '').strip()
+        is_active = bool(request.POST.get('is_active'))
+
+        if not name_val:
+            messages.error(request, "Option name cannot be empty.")
+            return redirect('lookup_manager_category', category=category)
+
+        try:
+            order_num = int(display_order) if display_order else model.objects.count() + 1
+        except ValueError:
+            order_num = model.objects.count() + 1
+
+        obj, created = model.objects.get_or_create(
+            **{name_field: name_val},
+            defaults={'display_order': order_num, 'is_active': is_active}
+        )
+        if not created and not obj.is_active and is_active:
+            obj.is_active = True
+            obj.save()
+
+        write_audit_log(
+            request.user, "ADD_LOOKUP", cfg['table_name'], name_val,
+            f"Added {cfg['title']} option '{name_val}'."
+        )
+        messages.success(request, f"Option '{name_val}' saved to {cfg['title']}.")
+
+    return redirect('lookup_manager_category', category=category)
+
+
+@login_required
+def lookup_toggle_view(request, category, item_id):
+    if not is_admin_user(request.user):
+        messages.error(request, "Access denied: Administrators only.")
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        cfg = get_lookup_config(category)
+        model = cfg['model']
+        pk_field = cfg['pk']
+        name_field = cfg['name_field']
+
+        item = get_object_or_404(model, **{pk_field: item_id})
+        item.is_active = not item.is_active
+        item.save()
+
+        status_str = "Activated" if item.is_active else "Deactivated"
+        write_audit_log(
+            request.user, "TOGGLE_LOOKUP", cfg['table_name'], str(getattr(item, name_field)),
+            f"{status_str} in {cfg['title']}."
+        )
+        messages.success(request, f"Option '{getattr(item, name_field)}' {status_str.lower()}.")
+
+    return redirect('lookup_manager_category', category=category)
+
+
+@login_required
+def lookup_delete_view(request, category, item_id):
+    if not is_admin_only(request.user):
+        messages.error(request, "Access denied: Only full Administrators can delete lookup options.")
+        return redirect('lookup_manager_category', category=category)
+
+    if request.method == 'POST':
+        cfg = get_lookup_config(category)
+        model = cfg['model']
+        pk_field = cfg['pk']
+        name_field = cfg['name_field']
+
+        item = get_object_or_404(model, **{pk_field: item_id})
+        name_val = getattr(item, name_field)
+        try:
+            item.delete()
+            write_audit_log(
+                request.user, "DELETE_LOOKUP", cfg['table_name'], str(name_val),
+                f"Permanently deleted option '{name_val}' from {cfg['title']}."
+            )
+            messages.success(request, f"Option '{name_val}' permanently deleted.")
+        except Exception:
+            messages.error(request, f"Cannot delete '{name_val}': option is linked to existing records. Deactivate it instead.")
+
+    return redirect('lookup_manager_category', category=category)
+
+
+@login_required
+def lookup_reorder_view(request, category):
+    if not is_admin_user(request.user):
+        return JsonResponse({'error': 'Access denied: Administrators only'}, status=403)
+
+    if request.method == 'POST':
+        cfg = get_lookup_config(category)
+        model = cfg['model']
+        pk_field = cfg['pk']
+
+        order_ids = []
+        try:
+            if request.body:
+                data = json.loads(request.body)
+                order_ids = data.get('order', [])
+        except Exception:
+            pass
+
+        if not order_ids:
+            order_ids = request.POST.getlist('order') or request.POST.getlist('order[]')
+
+        if not order_ids:
+            return JsonResponse({'error': 'No order sequence provided'}, status=400)
+
+        with transaction.atomic():
+            for idx, pid in enumerate(order_ids, start=1):
+                try:
+                    model.objects.filter(**{pk_field: int(pid)}).update(display_order=idx)
+                except (ValueError, TypeError):
+                    continue
+
+        write_audit_log(
+            request.user, "REORDER_LOOKUP", cfg['table_name'], f"{len(order_ids)} items",
+            f"Admin reordered {cfg['title']} options via drag-and-drop."
+        )
+        return JsonResponse({'status': 'ok', 'message': f"{cfg['title']} display order saved."})
+
+    return JsonResponse({'error': 'POST method required'}, status=405)
+
+
+# ==========================================
+# Gynae-Style Multi-Modality Investigation Pages
+# ==========================================
+
+@login_required
+def investigations_hub_view(request, clinical_id):
+    """
+    Dedicated Multi-Modality Diagnostic Workup Hub (replicates Gynae database design).
+    Tabs for Blood, Imaging, Pathology, and Molecular investigations with clean Access workstation style.
+    """
+    clinical = get_object_or_404(ClinicalDetails.objects.select_related('patient'), clinical_id=clinical_id)
+    patient = clinical.patient
+    active_tab = request.GET.get('tab', 'blood')
+    if active_tab not in ['blood', 'imaging', 'pathology', 'molecular']:
+        active_tab = 'blood'
+
+    context = {
+        'clinical': clinical,
+        'patient': patient,
+        'active_tab': active_tab,
+        'blood_tests': clinical.blood_tests.all(),
+        'imaging_tests': clinical.imaging_tests.all(),
+        'pathology_tests': clinical.pathology_tests.all(),
+        'molecular_tests': clinical.molecular_tests.all(),
+        'is_approved': clinical.status == 'Approved',
+    }
+    return render(request, 'mdt/investigations/investigations_hub.html', context)
+
+
+@login_required
+def blood_form_view(request, clinical_id, inv_id=None):
+    clinical = get_object_or_404(ClinicalDetails.objects.select_related('patient'), clinical_id=clinical_id)
+    patient = clinical.patient
+    is_approved = clinical.status == 'Approved'
+    if is_approved:
+        messages.error(request, "Cannot modify investigations for an Approved clinical record.")
+        return redirect('investigations_hub', clinical_id=clinical_id)
+
+    instance = get_object_or_404(BloodInvestigation, id=inv_id, clinical_details=clinical) if inv_id else None
+
+    if request.method == 'POST':
+        form = BloodInvestigationForm(request.POST, request.FILES, instance=instance)
+        if form.is_valid():
+            inv = form.save(commit=False)
+            inv.clinical_details = clinical
+            inv.entered_by = request.user.username
+            inv.save()
+            verb = "updated" if instance else "recorded"
+            write_audit_log(request.user, f"{'EDIT' if instance else 'ADD'}_BLOOD", "tblBloodInvestigation", patient.mr_no, f"Inv ID: {inv.id}")
+            messages.success(request, f"Blood investigation {verb} successfully.")
+            return redirect(f"{reverse('investigations_hub', kwargs={'clinical_id': clinical_id})}?tab=blood")
+        else:
+            for field, err_list in form.errors.items():
+                for err in err_list:
+                    messages.error(request, f"{field}: {err}")
+    else:
+        form = BloodInvestigationForm(instance=instance, initial={'test_date': date.today()} if not instance else {})
+
+    context = {
+        'form': form,
+        'clinical': clinical,
+        'patient': patient,
+        'instance': instance,
+        'is_edit': bool(instance),
+    }
+    return render(request, 'mdt/investigations/blood_form.html', context)
+
+
+@login_required
+def imaging_form_view(request, clinical_id, inv_id=None):
+    clinical = get_object_or_404(ClinicalDetails.objects.select_related('patient'), clinical_id=clinical_id)
+    patient = clinical.patient
+    is_approved = clinical.status == 'Approved'
+    if is_approved:
+        messages.error(request, "Cannot modify investigations for an Approved clinical record.")
+        return redirect('investigations_hub', clinical_id=clinical_id)
+
+    instance = get_object_or_404(ImagingInvestigation, id=inv_id, clinical_details=clinical) if inv_id else None
+
+    if request.method == 'POST':
+        form = ImagingInvestigationForm(request.POST, request.FILES, instance=instance)
+        if form.is_valid():
+            inv = form.save(commit=False)
+            inv.clinical_details = clinical
+            inv.entered_by = request.user.username
+            inv.save()
+            verb = "updated" if instance else "recorded"
+            write_audit_log(request.user, f"{'EDIT' if instance else 'ADD'}_IMAGING", "tblImagingInvestigation", patient.mr_no, f"Inv ID: {inv.id}")
+            messages.success(request, f"Imaging investigation {verb} successfully.")
+            return redirect(f"{reverse('investigations_hub', kwargs={'clinical_id': clinical_id})}?tab=imaging")
+        else:
+            for field, err_list in form.errors.items():
+                for err in err_list:
+                    messages.error(request, f"{field}: {err}")
+    else:
+        form = ImagingInvestigationForm(instance=instance, initial={'imaging_date': date.today()} if not instance else {})
+
+    context = {
+        'form': form,
+        'clinical': clinical,
+        'patient': patient,
+        'instance': instance,
+        'is_edit': bool(instance),
+    }
+    return render(request, 'mdt/investigations/imaging_form.html', context)
+
+
+@login_required
+def pathology_form_view(request, clinical_id, inv_id=None):
+    clinical = get_object_or_404(ClinicalDetails.objects.select_related('patient'), clinical_id=clinical_id)
+    patient = clinical.patient
+    is_approved = clinical.status == 'Approved'
+    if is_approved:
+        messages.error(request, "Cannot modify investigations for an Approved clinical record.")
+        return redirect('investigations_hub', clinical_id=clinical_id)
+
+    instance = get_object_or_404(PathologyInvestigation, id=inv_id, clinical_details=clinical) if inv_id else None
+
+    if request.method == 'POST':
+        form = PathologyInvestigationForm(request.POST, request.FILES, instance=instance)
+        if form.is_valid():
+            inv = form.save(commit=False)
+            inv.clinical_details = clinical
+            inv.entered_by = request.user.username
+            inv.save()
+            verb = "updated" if instance else "recorded"
+            write_audit_log(request.user, f"{'EDIT' if instance else 'ADD'}_PATHOLOGY", "tblPathologyInvestigation", patient.mr_no, f"Inv ID: {inv.id}")
+            messages.success(request, f"Pathology investigation {verb} successfully.")
+            return redirect(f"{reverse('investigations_hub', kwargs={'clinical_id': clinical_id})}?tab=pathology")
+        else:
+            for field, err_list in form.errors.items():
+                for err in err_list:
+                    messages.error(request, f"{field}: {err}")
+    else:
+        form = PathologyInvestigationForm(instance=instance, initial={'path_date': date.today()} if not instance else {})
+
+    context = {
+        'form': form,
+        'clinical': clinical,
+        'patient': patient,
+        'instance': instance,
+        'is_edit': bool(instance),
+    }
+    return render(request, 'mdt/investigations/pathology_form.html', context)
+
+
+@login_required
+def molecular_form_view(request, clinical_id, inv_id=None):
+    clinical = get_object_or_404(ClinicalDetails.objects.select_related('patient'), clinical_id=clinical_id)
+    patient = clinical.patient
+    is_approved = clinical.status == 'Approved'
+    if is_approved:
+        messages.error(request, "Cannot modify investigations for an Approved clinical record.")
+        return redirect('investigations_hub', clinical_id=clinical_id)
+
+    instance = get_object_or_404(MolecularInvestigation, id=inv_id, clinical_details=clinical) if inv_id else None
+
+    if request.method == 'POST':
+        form = MolecularInvestigationForm(request.POST, request.FILES, instance=instance)
+        if form.is_valid():
+            inv = form.save(commit=False)
+            inv.clinical_details = clinical
+            inv.entered_by = request.user.username
+            inv.save()
+            verb = "updated" if instance else "recorded"
+            write_audit_log(request.user, f"{'EDIT' if instance else 'ADD'}_MOLECULAR", "tblMolecularInvestigation", patient.mr_no, f"Inv ID: {inv.id}")
+            messages.success(request, f"Molecular investigation {verb} successfully.")
+            return redirect(f"{reverse('investigations_hub', kwargs={'clinical_id': clinical_id})}?tab=molecular")
+        else:
+            for field, err_list in form.errors.items():
+                for err in err_list:
+                    messages.error(request, f"{field}: {err}")
+    else:
+        form = MolecularInvestigationForm(instance=instance, initial={'test_date': date.today()} if not instance else {})
+
+    context = {
+        'form': form,
+        'clinical': clinical,
+        'patient': patient,
+        'instance': instance,
+        'is_edit': bool(instance),
+    }
+    return render(request, 'mdt/investigations/molecular_form.html', context)
 

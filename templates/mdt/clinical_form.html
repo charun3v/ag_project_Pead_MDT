@@ -121,6 +121,34 @@
             {{ form.mdt_discussion_for }}
           </div>
 
+          <!-- Clinical Action Buttons (Directly below clinical data) -->
+          <div class="d-flex align-items-center justify-content-between p-2 mt-3 rounded bg-light border">
+            <div class="text-secondary small fw-semibold">
+              {% if clinical.clinical_id %}
+                <span>Episode #{{ clinical.clinical_id }} &bull; Status: <strong class="{% if is_approved %}text-success{% else %}text-warning-emphasis{% endif %}">{{ clinical.status }}</strong></span>
+              {% else %}
+                <span>New Clinical Presentation Draft</span>
+              {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+              {% if not is_approved %}
+                <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary btn-sm px-3 fw-bold">
+                  <i class="bi bi-save me-1"></i> Save Draft
+                </button>
+                
+                {% if not is_new %}
+                <button type="button" class="btn btn-success btn-sm px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#modalConfirmApproval">
+                  <i class="bi bi-check2-circle me-1"></i> Approve Clinical Details
+                </button>
+                {% endif %}
+              {% else %}
+                <span class="badge badge-approved p-2 d-flex align-items-center">
+                  <i class="bi bi-lock-fill me-1"></i> Approved by {{ clinical.approved_by }}
+                </span>
+              {% endif %}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -130,7 +158,14 @@
       <div class="card card-clinical h-100">
         <div class="card-header bg-light py-1 d-flex justify-content-between align-items-center">
           <strong><i class="bi bi-diagram-3 text-primary me-1"></i> Diagnostic Investigations</strong>
-          <small class="text-muted">4 Categories</small>
+          <div class="d-flex align-items-center gap-2">
+            {% if not is_new %}
+            <a href="{% url 'investigations_hub' clinical.clinical_id %}" class="btn btn-outline-primary btn-sm py-0 px-2 fw-semibold" style="font-size: 0.75rem;">
+              <i class="bi bi-box-arrow-up-right me-1"></i> Full Hub
+            </a>
+            {% endif %}
+            <small class="text-muted">4 Categories</small>
+          </div>
         </div>
         <div class="card-body p-2">
           
@@ -354,25 +389,20 @@
       </div>
       
       <div class="d-flex gap-2 mt-2 mt-md-0">
-        {% if not is_approved %}
-          <button type="submit" name="action" value="save_draft" class="btn btn-outline-primary btn-sm px-3 fw-semibold">
-            <i class="bi bi-save me-1"></i> Save Draft
-          </button>
-          
-          {% if not is_new %}
-          <button type="button" class="btn btn-success btn-sm px-3 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalConfirmApproval">
-            <i class="bi bi-check2-circle me-1"></i> Approve Clinical Details
-          </button>
-          {% endif %}
-        {% else %}
-          <span class="badge badge-approved p-2 d-flex align-items-center">
-            <i class="bi bi-lock-fill me-1"></i> Record Approved by {{ clinical.approved_by }} on {{ clinical.approved_on|date:"d-M-Y H:i" }}
-          </span>
-          {% if clinical.consensus %}
-          <a href="{% url 'consensus_edit' clinical.consensus.consensus_id %}" class="btn btn-primary btn-sm px-3 fw-semibold">
-            <i class="bi bi-chat-square-text me-1"></i> Proceed to MDT Discussion
-          </a>
-          <a href="{% url 'live_presentation' clinical.consensus.consensus_id %}" class="btn btn-info btn-sm px-3 fw-semibold text-white">
+        {% if clinical.clinical_id %}
+        <a href="{% url 'investigations_hub' clinical.clinical_id %}" class="btn btn-outline-primary btn-sm px-3 fw-semibold">
+          <i class="bi bi-diagram-3 me-1"></i> Investigations Hub
+        </a>
+        {% endif %}
+        {% if is_approved and clinical.consensus %}
+        <a href="{% url 'consensus_edit' clinical.consensus.consensus_id %}" class="btn btn-primary btn-sm px-3 fw-semibold">
+          <i class="bi bi-chat-square-text me-1"></i> Proceed to MDT Discussion
+        </a>
+        <a href="{% url 'live_presentation' clinical.consensus.consensus_id %}" class="btn btn-info btn-sm px-3 fw-semibold text-white">
+          <i class="bi bi-easel2 me-1"></i> Live Presentation
+        </a>
+        {% endif %}
+      </div>
             <i class="bi bi-tv me-1"></i> Live Screen Mode
           </a>
           {% endif %}
@@ -488,7 +518,7 @@
               {{ imaging_form.details }}
             </div>
             <div class="col-12">
-              <label class="form-label-compact">Impression</label>
+              <label class="form-label-compact fw-bold" style="color: #b00000;">Overall Imaging Impression *</label>
               {{ imaging_form.impression }}
             </div>
             <div class="col-12">

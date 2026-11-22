@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edit Blood Test{% else %}New Blood Test{% endif %} - {{ patient.mr_no }} — Pead MDT{% endblock %}
+
+{% block content %}
+<!-- Patient Banner -->
+<div class="patient-banner d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex align-items-center flex-wrap gap-2">
+    <h5 class="mb-0 text-white fw-bold"><i class="bi bi-person-badge me-1"></i> {{ patient.name }}</h5>
+    <span class="badge bg-white text-primary fw-bold">MR: {{ patient.mr_no }}</span>
+    <span class="banner-detail"><i class="bi bi-gender-ambiguous"></i> {{ patient.get_sex_display }}</span>
+    <span class="banner-detail"><i class="bi bi-hourglass-split"></i> Age: {{ patient.format_age }}</span>
+    <span class="banner-detail"><i class="bi bi-tag"></i> Reg Diag: <strong>{{ patient.diagnosis }}</strong></span>
+  </div>
+  <div>
+    <span class="badge badge-info-subtle px-2 py-1">Blood Investigations</span>
+  </div>
+</div>
+
+<!-- Access Subform: Blood Lab Record -->
+<div class="access-subform shadow-sm">
+  <div class="access-subform-header">
+    <div class="d-flex align-items-center gap-2">
+      <span style="font-size: 15px;">🩸</span>
+      <span class="fw-bold">frmBlood: Hematology, RFT, LFT & Biomarker Laboratory Panels</span>
+    </div>
+    <div>
+      <a href="{% url 'investigations_hub' clinical.clinical_id %}?tab=blood" class="text-white text-decoration-underline small">
+        Back to Investigations Hub
+      </a>
+    </div>
+  </div>
+
+  <div class="access-subform-body p-3">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <!-- Section 1: Specimen & Date -->
+      <fieldset style="border: 1px solid #bfae95; padding: 12px 14px; margin-bottom: 14px; background: #faf5ed; border-radius: 4px;">
+        <legend style="font-weight: bold; color: #003366; padding: 0 8px; font-size: 12px;">
+          1. Laboratory Sample Parameters
+        </legend>
+
+        <div class="row g-3">
+          <div class="col-md-4 col-sm-6 col-12">
+            <label class="access-label fw-bold text-danger-emphasis">Test Date *</label>
+            {{ form.test_date }}
+          </div>
+
+          <div class="col-md-4 col-sm-6 col-12">
+            <label class="access-label fw-bold text-danger-emphasis">Specimen / Panel Type *</label>
+            {{ form.specimen_type }}
+          </div>
+
+          <div class="col-md-4 col-sm-12 col-12">
+            <label class="access-label">Upload Lab Report File / PDF</label>
+            {{ form.attachment }}
+            {% if instance and instance.attachment %}
+              <div class="mt-1 small">
+                Current: <a href="{{ instance.attachment.url }}" target="_blank"><i class="bi bi-paperclip"></i> View File</a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Section 2: Laboratory Findings & Summary -->
+      <fieldset style="border: 1px solid #bfae95; padding: 12px 14px; margin-bottom: 14px; background: #faf5ed; border-radius: 4px;">
+        <legend style="font-weight: bold; color: #003366; padding: 0 8px; font-size: 12px;">
+          2. Complete Blood Count, Renal/Liver Parameters & Tumor Markers
+        </legend>
+
+        <div class="row g-3">
+          <div class="col-md-7 col-12">
+            <label class="access-label fw-bold">Laboratory Findings & Measured Values</label>
+            {{ form.details }}
+            <div class="text-muted small mt-1" style="font-size: 11px;">
+              Enter Hb, TC, Platelets, ANC, ALC, Serum Creatinine, Urea, SGOT, SGPT, Bilirubin, Ferritin, LDH, etc.
+            </div>
+          </div>
+
+          <div class="col-md-5 col-12">
+            <label class="access-label fw-bold">Overall Impression / Clinical Summary</label>
+            {{ form.impression }}
+            <div class="text-muted small mt-1" style="font-size: 11px;">
+              Summary of cytopenias, organ function adequacy for chemotherapy, or biomarker status.
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Action Buttons -->
+      <div class="d-flex align-items-center gap-2 p-2 rounded" style="background: #e6dac8; border: 1px solid #bfae95;">
+        <button type="submit" class="btn-access btn-primary-action px-3 py-1">
+          💾 {% if is_edit %}Update Blood Record{% else %}Save Blood Record{% endif %}
+        </button>
+        <a href="{% url 'investigations_hub' clinical.clinical_id %}?tab=blood" class="btn-access">
+          ✖️ Cancel / Back to Hub
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

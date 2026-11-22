@@ -3,93 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Pead MDT — Paediatric Oncology System{% endblock %}</title>
+  <title>{% block title %}Peadiatric MDT scheduling and planning platform{% endblock %}</title>
   
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   
-  <!-- Custom Compact Clinical CSS -->
+  <!-- Custom Compact Clinical & Access Workstation Theme CSS -->
   <link rel="stylesheet" href="/static/css/compact_clinical.css">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
 
-  <!-- Clinical Navigation Bar -->
-  <nav class="navbar navbar-expand-lg navbar-clinical no-print">
-    <div class="container-fluid">
-      <a class="navbar-brand d-flex align-items-center" href="{% url 'dashboard' %}">
-        <i class="bi bi-hospital me-2 text-primary"></i>
-        <span>Pead MDT <small class="text-white-50 fw-normal ms-1" style="font-size: 0.72rem;">| Oncology System</small></span>
-      </a>
-      
-      <button class="navbar-toggler text-white" type="button" data-bs-toggle="collapse" data-bs-target="#navContent">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-
-      <div class="collapse navbar-collapse" id="navContent">
-        {% if user.is_authenticated %}
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
-              <i class="bi bi-speedometer2 me-1"></i> Dashboard
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'patient_search' %}active{% endif %}" href="{% url 'patient_search' %}">
-              <i class="bi bi-search me-1"></i> Search Patient
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'patient_create' %}active{% endif %}" href="{% url 'patient_create' %}">
-              <i class="bi bi-person-plus me-1"></i> Register Patient
-            </a>
-          </li>
-          {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'user_list' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_edit' %}active{% endif %}" href="{% url 'user_list' %}">
-              <i class="bi bi-people me-1"></i> Users
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'manage_purposes' %}active{% endif %}" href="{% url 'manage_purposes' %}">
-              <i class="bi bi-tag me-1"></i> Lookups
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'export_hub' %}active{% endif %}" href="{% url 'export_hub' %}">
-              <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Data
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'audit_log_view' %}active{% endif %}" href="{% url 'audit_log_view' %}">
-              <i class="bi bi-shield-check me-1"></i> Audit Trail
-            </a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="/admin/" target="_blank">
-              <i class="bi bi-gear me-1"></i> Admin Panel
-            </a>
-          </li>
-          {% endif %}
-        </ul>
-
-        <!-- User Profile & Session Controls -->
-        <div class="d-flex align-items-center text-white-50 small">
-          <span class="me-3">
-            <i class="bi bi-person-circle text-info me-1"></i>
-            <strong class="text-white">{{ user.first_name|default:user.username }}</strong>
-            <span class="badge bg-secondary ms-1" style="font-size: 0.7rem;">{{ user.profile.role|default:"User" }}</span>
-          </span>
-          <a href="{% url 'logout' %}" class="btn btn-outline-light btn-sm py-0 px-2" style="font-size: 0.78rem;">
-            <i class="bi bi-box-arrow-right me-1"></i> Logout
-          </a>
-        </div>
-        {% endif %}
+  <!-- Top Institutional Access Header (Thick Header Bar - Scheduler Design) -->
+  <header class="access-app-header no-print">
+    <div class="app-title">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 20px;">🏥</span>
+        <span style="font-size: 16px; font-weight: bold; letter-spacing: 0.5px;">Peadiatric MDT scheduling and planning platform</span>
+        <span style="font-size: 10px; font-weight: normal; opacity: 0.85; margin-left: 6px; background: rgba(255,255,255,0.15); padding: 1px 6px; border-radius: 3px;">[v2.0]</span>
+      </div>
+      <div style="font-size: 11px; opacity: 0.92; font-weight: 500; margin-left: 30px; color: #e2edfa;">
+        Kidwai Memorial Institute of Oncology — Paediatric Oncology Multidisciplinary Team
       </div>
     </div>
+    <div class="app-user">
+      {% if user.is_authenticated %}
+        <span>👤 <strong>{{ user.first_name|default:user.username }}</strong>
+          {% if user.is_superuser or user.profile.role == 'Admin' %}
+            <span class="badge-admin">Admin</span>
+          {% elif user.profile.role == 'SubAdmin' %}
+            <span class="badge-subadmin">SubAdmin</span>
+          {% else %}
+            <span class="badge-locked">{{ user.profile.role|default:"Consultant" }}</span>
+          {% endif %}
+        </span>
+        <span style="opacity: 0.5;">|</span>
+        <a href="{% url 'logout' %}">Logout</a>
+      {% else %}
+        <a href="{% url 'login' %}" style="color: #ffffff; text-decoration: underline;">Login</a>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- Ribbon Action Toolbar (Scheduler Workstation Design) -->
+  {% if user.is_authenticated %}
+  <nav class="access-toolbar no-print">
+    <a href="{% url 'dashboard' %}" class="action-ribbon-btn {% if request.resolver_match.url_name == 'dashboard' %}btn-highlight{% endif %}">
+      <i class="bi bi-speedometer2"></i> Dashboard
+    </a>
+    <a href="{% url 'patient_create' %}" class="action-ribbon-btn {% if request.resolver_match.url_name == 'patient_create' %}btn-highlight{% endif %}">
+      <i class="bi bi-person-plus-fill"></i> Register Patient
+    </a>
+    <a href="{% url 'patient_search' %}" class="action-ribbon-btn {% if request.resolver_match.url_name == 'patient_search' %}btn-highlight{% endif %}">
+      <i class="bi bi-search"></i> Search Patients
+    </a>
+
+    {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
+    <span style="color: #888; margin: 0 4px;">|</span>
+    <a href="{% url 'lookup_manager' %}" class="action-ribbon-btn {% if 'lookup' in request.resolver_match.url_name or request.resolver_match.url_name == 'manage_purposes' %}btn-highlight{% endif %}" title="Centralized Clinical Dropdowns & Reference Tables">
+      <i class="bi bi-tags-fill"></i> Reference Lookups
+    </a>
+    <a href="{% url 'user_list' %}" class="action-ribbon-btn {% if 'user_' in request.resolver_match.url_name %}btn-highlight{% endif %}">
+      <i class="bi bi-people-fill"></i> Users
+    </a>
+    <a href="{% url 'export_hub' %}" class="action-ribbon-btn {% if 'export' in request.resolver_match.url_name %}btn-highlight{% endif %}">
+      <i class="bi bi-file-earmark-spreadsheet-fill"></i> Export Data
+    </a>
+    <a href="{% url 'audit_log_view' %}" class="action-ribbon-btn {% if request.resolver_match.url_name == 'audit_log_view' %}btn-highlight{% endif %}">
+      <i class="bi bi-shield-lock-fill"></i> Audit Trail
+    </a>
+    <a href="/admin/" target="_blank" class="action-ribbon-btn">
+      <i class="bi bi-gear-fill"></i> Django Admin ↗
+    </a>
+    {% endif %}
+
+    <div style="flex-grow: 1;"></div>
+    <span style="font-size: 11px; color: #555555; margin-right: 6px;">{{ "now"|date:"D, d M Y" }}</span>
   </nav>
+  {% endif %}
 
   <!-- Flash Messages / Notifications -->
   <div class="container-fluid mt-2 no-print">
@@ -117,7 +110,7 @@
 
   <!-- Compact Footer -->
   <footer class="text-center text-muted small py-2 mt-4 border-top no-print" style="font-size: 0.75rem;">
-    <span>Paediatric Oncology Multidisciplinary Team Information System &bull; Version 2.0 (Django)</span>
+    <span>Peadiatric MDT scheduling and planning platform &bull; Version 2.0 (Django) &bull; KMIO</span>
   </footer>
 
   <!-- Bootstrap JS -->

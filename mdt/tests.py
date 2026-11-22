@@ -8,6 +8,7 @@ from mdt.models import (
     AuditLog, UserProfile, BloodInvestigation, DiscussionPurpose
 )
 from mdt.services import generate_next_mdt_id, cascade_diagnosis
+from mdt.forms import ImagingInvestigationForm, BloodInvestigationForm, PathologyInvestigationForm, MolecularInvestigationForm
 
 
 class PeadMDTTests(TestCase):
@@ -425,6 +426,72 @@ class PeadMDTTests(TestCase):
         self.assertEqual(p3.display_order, 1)
         self.assertEqual(p1.display_order, 2)
         self.assertEqual(p2.display_order, 3)
+
+    def test_lookup_manager_and_investigations_hub(self):
+        admin_client = Client()
+        admin_client.login(username='adminuser', password='password123')
+
+        # 1. Lookup Manager View
+        resp = admin_client.get(reverse('lookup_manager'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'frmLookupManager')
+        self.assertContains(resp, 'Reference Categories')
+
+        # Add Option via Lookup Manager
+        resp_add = admin_client.post(reverse('lookup_add', kwargs={'category': 'imaging_type'}), {
+            'name_value': 'PET-MRI Hybrid',
+            'display_order': 15,
+            'is_active': '1'
+        })
+        self.assertEqual(resp_add.status_code, 302)
+        self.assertTrue(ImagingType.objects.filter(name='PET-MRI Hybrid').exists())
+
+        # Toggle Option
+        opt = ImagingType.objects.get(name='PET-MRI Hybrid')
+        resp_toggle = admin_client.post(reverse('lookup_toggle', kwargs={'category': 'imaging_type', 'item_id': opt.id}))
+        self.assertEqual(resp_toggle.status_code, 302)
+        opt.refresh_from_db()
+        self.assertFalse(opt.is_active)
+
+        # 2. Imaging Study Mandatory Impression Validation
+        clin = ClinicalDetails.objects.create(patient=self.patient, status='Draft')
+        
+        # Missing impression fails validation
+        form_invalid = ImagingInvestigationForm(data={
+            'imaging_date': date.today(),
+            'imaging_type': self.imaging_type.id,
+            'site': self.imaging_site.id,
+            'details': 'Large pelvic mass',
+            'impression': '',  # Empty impression
+        })
+        self.assertFalse(form_invalid.is_valid())
+        self.assertIn('impression', form_invalid.errors)
+
+        # Valid with impression
+        form_valid = ImagingInvestigationForm(data={
+            'imaging_date': date.today(),
+            'imaging_type': self.imaging_type.id,
+            'site': self.imaging_site.id,
+            'details': 'Large retroperitoneal neuroblastoma',
+            'impression': 'Primary retroperitoneal neuroblastoma, encasing renal vessels',
+        })
+        self.assertTrue(form_valid.is_valid())
+        img_study = form_valid.save(commit=False)
+        img_study.clinical_details = clin
+        img_study.save()
+        self.assertIsNotNone(img_study.id)
+
+        # 3. Investigations Hub View
+        resp_hub = admin_client.get(reverse('investigations_hub', kwargs={'clinical_id': clin.clinical_id}))
+        self.assertEqual(resp_hub.status_code, 200)
+        self.assertContains(resp_hub, 'frmInvestigations')
+        self.assertContains(resp_hub, 'Diagnostic & Staging Workup')
+
+        # Hub Imaging Tab
+        resp_img_tab = admin_client.get(f"{reverse('investigations_hub', kwargs={'clinical_id': clin.clinical_id})}?tab=imaging")
+        self.assertEqual(resp_img_tab.status_code, 200)
+        self.assertContains(resp_img_tab, 'Primary retroperitoneal neuroblastoma')
+
 
 
 

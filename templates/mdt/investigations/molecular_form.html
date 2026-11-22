@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_edit %}Edit Molecular Investigation{% else %}New Molecular Investigation{% endif %} - {{ patient.mr_no }} — Pead MDT{% endblock %}
+
+{% block content %}
+<!-- Patient Banner -->
+<div class="patient-banner d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex align-items-center flex-wrap gap-2">
+    <h5 class="mb-0 text-white fw-bold"><i class="bi bi-person-badge me-1"></i> {{ patient.name }}</h5>
+    <span class="badge bg-white text-primary fw-bold">MR: {{ patient.mr_no }}</span>
+    <span class="banner-detail"><i class="bi bi-gender-ambiguous"></i> {{ patient.get_sex_display }}</span>
+    <span class="banner-detail"><i class="bi bi-hourglass-split"></i> Age: {{ patient.format_age }}</span>
+    <span class="banner-detail"><i class="bi bi-tag"></i> Reg Diag: <strong>{{ patient.diagnosis }}</strong></span>
+  </div>
+  <div>
+    <span class="badge badge-info-subtle px-2 py-1">Molecular & Cytogenetics</span>
+  </div>
+</div>
+
+<!-- Access Subform: Molecular Investigation Form -->
+<div class="access-subform shadow-sm">
+  <div class="access-subform-header">
+    <div class="d-flex align-items-center gap-2">
+      <span style="font-size: 15px;">🧬</span>
+      <span class="fw-bold">frmMolecular: Molecular Genetics, FISH, NGS Panels & Biomarker Alterations</span>
+    </div>
+    <div>
+      <a href="{% url 'investigations_hub' clinical.clinical_id %}?tab=molecular" class="text-white text-decoration-underline small">
+        Back to Investigations Hub
+      </a>
+    </div>
+  </div>
+
+  <div class="access-subform-body p-3">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <!-- Section 1: Assay Metadata -->
+      <fieldset style="border: 1px solid #bfae95; padding: 12px 14px; margin-bottom: 14px; background: #faf5ed; border-radius: 4px;">
+        <legend style="font-weight: bold; color: #003366; padding: 0 8px; font-size: 12px;">
+          1. Molecular Assay Parameters & Sample Details
+        </legend>
+
+        <div class="row g-3">
+          <div class="col-md-4 col-sm-6 col-12">
+            <label class="access-label fw-bold text-danger-emphasis">Test Date *</label>
+            {{ form.test_date }}
+          </div>
+
+          <div class="col-md-4 col-sm-6 col-12">
+            <label class="access-label fw-bold text-danger-emphasis">Molecular Test Type *</label>
+            {{ form.test_type }}
+          </div>
+
+          <div class="col-md-4 col-sm-12 col-12">
+            <label class="access-label">Molecular Lab Ref / Assay ID</label>
+            {{ form.lab_reference_no }}
+          </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-md-6 col-12">
+            <label class="access-label">Upload Genomic Report PDF / Sequencing Profile</label>
+            {{ form.attachment }}
+            {% if instance and instance.attachment %}
+              <div class="mt-1 small">
+                Current: <a href="{{ instance.attachment.url }}" target="_blank"><i class="bi bi-paperclip"></i> View Report</a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Section 2: Genomic Alterations & Biomarker Interpretation -->
+      <fieldset style="border: 1px solid #bfae95; padding: 12px 14px; margin-bottom: 14px; background: #faf5ed; border-radius: 4px;">
+        <legend style="font-weight: bold; color: #003366; padding: 0 8px; font-size: 12px;">
+          2. Genomic Findings & Targetable Biomarker Alterations
+        </legend>
+
+        <div class="row g-3">
+          <div class="col-md-6 col-12">
+            <label class="access-label fw-bold">Genomic / Cytogenetic Findings</label>
+            {{ form.details }}
+            <div class="text-muted small mt-1" style="font-size: 11px;">
+              EWSR1 rearrangement, MYCN amplification, 1p/11q deletion, ALK F1174L/R1275Q, BRAF V600E, KIAA1549-BRAF, NTRK fusion, TP53 mutations.
+            </div>
+          </div>
+
+          <div class="col-md-6 col-12">
+            <label class="access-label fw-bold" style="color: #b00000;">Biomarker Interpretation / Actionable Targets *</label>
+            {{ form.impression }}
+            {% if form.impression.errors %}<div class="text-danger small fw-bold">{{ form.impression.errors }}</div>{% endif %}
+            <div class="text-muted small mt-1" style="font-size: 11px;">
+              Mandatory: therapeutic implications, prognostic stratification (e.g. High Risk Neuroblastoma), or eligibility for targeted kinase inhibitors.
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Action Buttons -->
+      <div class="d-flex align-items-center gap-2 p-2 rounded" style="background: #e6dac8; border: 1px solid #bfae95;">
+        <button type="submit" class="btn-access btn-primary-action px-3 py-1">
+          💾 {% if is_edit %}Update Molecular Test{% else %}Save Molecular Test{% endif %}
+        </button>
+        <a href="{% url 'investigations_hub' clinical.clinical_id %}?tab=molecular" class="btn-access">
+          ✖️ Cancel / Back to Hub
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

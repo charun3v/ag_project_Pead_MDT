@@ -86,14 +86,29 @@ class BloodInvestigationForm(forms.ModelForm):
         widgets = {
             'test_date': forms.DateInput(attrs={'class': 'form-control form-control-sm', 'type': 'date'}),
             'specimen_type': forms.Select(attrs={'class': 'form-select form-select-sm'}),
-            'details': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2, 'placeholder': 'CBC, LFT, KFT, Tumor markers, Cytology...'}),
-            'impression': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Summary / Impression'}),
+            'details': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'CBC, LFT, KFT, Tumor markers, Cytology...'}),
+            'impression': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2, 'placeholder': 'Summary / Impression'}),
             'attachment': forms.FileInput(attrs={'class': 'form-control form-control-sm'}),
             'linked_to_mdt': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['specimen_type'].queryset = BloodSpecimenType.objects.filter(is_active=True).order_by('display_order', 'name')
+
 
 class ImagingInvestigationForm(forms.ModelForm):
+    impression = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Overall Imaging Impression / Conclusion (Mandatory)'}),
+        label="Overall Imaging Impression *"
+    )
+    details = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Radiology findings, organ-by-organ evaluation, measurements...'}),
+        label="Radiology Findings"
+    )
+
     class Meta:
         model = ImagingInvestigation
         fields = ['imaging_date', 'imaging_type', 'site', 'details', 'impression', 'attachment', 'linked_to_mdt']
@@ -101,14 +116,28 @@ class ImagingInvestigationForm(forms.ModelForm):
             'imaging_date': forms.DateInput(attrs={'class': 'form-control form-control-sm', 'type': 'date'}),
             'imaging_type': forms.Select(attrs={'class': 'form-select form-select-sm'}),
             'site': forms.Select(attrs={'class': 'form-select form-select-sm'}),
-            'details': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2, 'placeholder': 'CT / MRI / PET findings, dimensions, vascular encasement...'}),
-            'impression': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Conclusion / RECIST Response'}),
             'attachment': forms.FileInput(attrs={'class': 'form-control form-control-sm'}),
             'linked_to_mdt': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['imaging_type'].queryset = ImagingType.objects.filter(is_active=True).order_by('display_order', 'name')
+        self.fields['site'].queryset = ImagingSite.objects.filter(is_active=True).order_by('display_order', 'name')
+
 
 class PathologyInvestigationForm(forms.ModelForm):
+    impression = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Histopathological Diagnosis / Overall Impression (Mandatory)'}),
+        label="Histopathological Diagnosis *"
+    )
+    details = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Microscopic examination, IHC markers, margins, gross details...'}),
+        label="Microscopic & Gross Findings"
+    )
+
     class Meta:
         model = PathologyInvestigation
         fields = ['path_date', 'lab_reference_no', 'specimen_type', 'site_of_biopsy', 'details', 'impression', 'attachment', 'linked_to_mdt']
@@ -117,14 +146,27 @@ class PathologyInvestigationForm(forms.ModelForm):
             'lab_reference_no': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Biopsy / Block No'}),
             'specimen_type': forms.Select(attrs={'class': 'form-select form-select-sm'}),
             'site_of_biopsy': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Biopsy Anatomical Site'}),
-            'details': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2, 'placeholder': 'Morphology, IHC markers (CD99, Synapto, Desmin, Ki67)...'}),
-            'impression': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Histopathological Diagnosis'}),
             'attachment': forms.FileInput(attrs={'class': 'form-control form-control-sm'}),
             'linked_to_mdt': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['specimen_type'].queryset = PathologySpecimenType.objects.filter(is_active=True).order_by('display_order', 'name')
+
 
 class MolecularInvestigationForm(forms.ModelForm):
+    impression = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Biomarker Impression / Targetable Alterations (Mandatory)'}),
+        label="Molecular Interpretation *"
+    )
+    details = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 3, 'placeholder': 'Specific translocations (EWSR1, MYCN, ALK), NGS mutations, cytogenetics...'}),
+        label="Genomic / Molecular Findings"
+    )
+
     class Meta:
         model = MolecularInvestigation
         fields = ['test_date', 'test_type', 'lab_reference_no', 'details', 'impression', 'attachment', 'linked_to_mdt']
@@ -132,8 +174,10 @@ class MolecularInvestigationForm(forms.ModelForm):
             'test_date': forms.DateInput(attrs={'class': 'form-control form-control-sm', 'type': 'date'}),
             'test_type': forms.Select(attrs={'class': 'form-select form-select-sm'}),
             'lab_reference_no': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Lab / Panel Ref No'}),
-            'details': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 2, 'placeholder': 'Translocations (EWSR1, MYCN, ALK, BRAF), NGS, Cytogenetics...'}),
-            'impression': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Genomic Status / Targetable Aberration'}),
             'attachment': forms.FileInput(attrs={'class': 'form-control form-control-sm'}),
             'linked_to_mdt': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['test_type'].queryset = MolecularTestType.objects.filter(is_active=True).order_by('display_order', 'name')

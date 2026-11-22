@@ -1,0 +1,386 @@
+{% extends 'base.html' %}
+
+{% block title %}Investigations Hub - {{ patient.mr_no }} {{ patient.name }} — Pead MDT{% endblock %}
+
+{% block extra_head %}
+<style>
+  .inv-tab-bar {
+    display: flex;
+    background: #d8cebc;
+    border-bottom: 2px solid #003366;
+    padding-left: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .inv-tab {
+    padding: 7px 16px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+    text-decoration: none;
+    border: 1px solid #bfae95;
+    border-bottom: none;
+    background: #e6dac8;
+    margin-right: 4px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    transition: all 0.15s ease;
+  }
+  .inv-tab:hover {
+    background: #f5ede0;
+    color: #003366;
+  }
+  .inv-tab.active {
+    background: var(--card-bg);
+    color: #003366;
+    border-color: #003366;
+    border-bottom: 2px solid var(--card-bg);
+    margin-bottom: -2px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Patient Clinical Banner -->
+<div class="patient-banner d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex align-items-center flex-wrap gap-2">
+    <h5 class="mb-0 text-white fw-bold"><i class="bi bi-person-badge me-1"></i> {{ patient.name }}</h5>
+    <span class="badge bg-white text-primary fw-bold">MR: {{ patient.mr_no }}</span>
+    <span class="banner-detail"><i class="bi bi-gender-ambiguous"></i> {{ patient.get_sex_display }}</span>
+    <span class="banner-detail"><i class="bi bi-calendar-event"></i> DOB: {{ patient.date_of_birth|date:"d-M-Y" }}</span>
+    <span class="banner-detail"><i class="bi bi-hourglass-split"></i> Age: {{ patient.format_age }}</span>
+    <span class="banner-detail"><i class="bi bi-tag"></i> Reg Diag: <strong>{{ patient.diagnosis }}</strong></span>
+  </div>
+  <div>
+    <span class="badge {% if is_approved %}bg-success{% else %}badge-draft{% endif %} px-2 py-1">
+      Status: {{ clinical.status }}
+    </span>
+  </div>
+</div>
+
+<!-- Access Subform: Multi-Modality Diagnostic Workup -->
+<div class="access-subform shadow-sm">
+  <div class="access-subform-header">
+    <div class="d-flex align-items-center gap-2">
+      <span style="font-size: 15px;">🧪</span>
+      <span class="fw-bold">frmInvestigations: Multi-Modality Diagnostic & Staging Workup</span>
+      <span class="text-white-50 ms-2" style="font-size: 11px;">(Episode #{{ clinical.clinical_id }}{% if clinical.mdt_id %} &bull; MDT ID: {{ clinical.mdt_id }}{% endif %})</span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'clinical_edit' clinical.clinical_id %}" class="btn btn-outline-light btn-sm py-0 px-2" style="font-size: 11px;">
+        <i class="bi bi-arrow-left me-1"></i> Back to Clinical Form
+      </a>
+      <a href="{% url 'report_clinical_summary' clinical.clinical_id %}" target="_blank" class="btn btn-light btn-sm py-0 px-2 fw-semibold text-primary" style="font-size: 11px;">
+        <i class="bi bi-printer me-1"></i> Print Summary
+      </a>
+    </div>
+  </div>
+
+  <div class="access-subform-body p-3">
+    <!-- Tab Navigation Bar (Gynae Database Architecture) -->
+    <div class="inv-tab-bar">
+      <a href="?tab=blood" class="inv-tab {% if active_tab == 'blood' %}active{% endif %}">
+        🩸 Blood Tests ({{ blood_tests.count }})
+      </a>
+      <a href="?tab=imaging" class="inv-tab {% if active_tab == 'imaging' %}active{% endif %}">
+        🩻 Radiology & Imaging ({{ imaging_tests.count }})
+      </a>
+      <a href="?tab=pathology" class="inv-tab {% if active_tab == 'pathology' %}active{% endif %}">
+        🔬 Pathology & Cytology ({{ pathology_tests.count }})
+      </a>
+      <a href="?tab=molecular" class="inv-tab {% if active_tab == 'molecular' %}active{% endif %}">
+        🧬 Molecular & Cytogenetics ({{ molecular_tests.count }})
+      </a>
+    </div>
+
+    <!-- TAB 1: BLOOD INVESTIGATIONS -->
+    {% if active_tab == 'blood' %}
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div>
+          <strong class="text-dark" style="font-size: 12px; color: #003366 !important;">
+            🩸 Hematology, Renal & Liver Function Panels, Tumor Markers
+          </strong>
+          <div class="text-muted small" style="font-size: 11px;">CBC, ANC, ALC, Platelets, Serum Creatinine, LFTs, and electrolytes.</div>
+        </div>
+        {% if not is_approved %}
+        <a href="{% url 'blood_add' clinical.clinical_id %}" class="btn-access btn-primary-action">
+          ➕ Add Blood Lab Record
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive" style="border: 1px solid #bfae95; border-radius: 4px;">
+        <table class="access-table mb-0">
+          <thead>
+            <tr>
+              <th style="width: 110px;">Date</th>
+              <th style="width: 180px;">Specimen / Test</th>
+              <th>Laboratory Findings & Clinical Details</th>
+              <th style="width: 200px;">Summary / Impression</th>
+              <th style="width: 100px; text-align: center;">Attachment</th>
+              {% if not is_approved %}<th style="width: 90px; text-align: right;">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in blood_tests %}
+            <tr>
+              <td class="fw-semibold text-nowrap">{{ b.test_date|date:"d-M-Y" }}</td>
+              <td><strong style="color: #003366;">{{ b.specimen_type.name }}</strong></td>
+              <td>{{ b.details|linebreaksbr }}</td>
+              <td><span class="badge bg-secondary-subtle text-dark border px-2">{{ b.impression|default:"—" }}</span></td>
+              <td style="text-align: center;">
+                {% if b.attachment %}
+                <a href="{{ b.attachment.url }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 11px;">
+                  <i class="bi bi-paperclip"></i> File
+                </a>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              {% if not is_approved %}
+              <td style="text-align: right;" class="text-nowrap">
+                <a href="{% url 'blood_edit' clinical.clinical_id b.id %}" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit Record">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'investigation_delete' 'blood' b.id %}" class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" onclick="return confirm('Delete this blood investigation?');" title="Delete">
+                  <i class="bi bi-trash3"></i>
+                </a>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{% if not is_approved %}6{% else %}5{% endif %}" class="text-center text-muted py-4">
+                No blood investigations recorded for this clinical presentation.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    <!-- TAB 2: RADIOLOGY & IMAGING (Mandatory Impression) -->
+    {% elif active_tab == 'imaging' %}
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div>
+          <strong class="text-dark" style="font-size: 12px; color: #003366 !important;">
+            🩻 Diagnostic Radiology, CT, MRI, PET-CT, USG & Nuclear Scans
+          </strong>
+          <div class="text-muted small" style="font-size: 11px;">Multi-modality staging scans, tumor dimensions, vascular encasement, and mandatory impression.</div>
+        </div>
+        {% if not is_approved %}
+        <a href="{% url 'imaging_add' clinical.clinical_id %}" class="btn-access btn-primary-action">
+          ➕ Add Imaging Study
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive" style="border: 1px solid #bfae95; border-radius: 4px;">
+        <table class="access-table mb-0">
+          <thead>
+            <tr>
+              <th style="width: 110px;">Date</th>
+              <th style="width: 140px;">Modality</th>
+              <th style="width: 160px;">Anatomical Site</th>
+              <th>Radiology Findings</th>
+              <th style="width: 240px; color: #b00000;">Overall Impression *</th>
+              <th style="width: 100px; text-align: center;">Scan File</th>
+              {% if not is_approved %}<th style="width: 90px; text-align: right;">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in imaging_tests %}
+            <tr>
+              <td class="fw-semibold text-nowrap">{{ i.imaging_date|date:"d-M-Y" }}</td>
+              <td><span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2">{{ i.imaging_type.name }}</span></td>
+              <td><strong>{{ i.site.name }}</strong></td>
+              <td>{{ i.details|linebreaksbr }}</td>
+              <td>
+                <div class="p-1 rounded" style="background: #faf5ed; border: 1px solid #bfae95; font-size: 11.5px;">
+                  <strong class="text-danger-emphasis">{{ i.impression }}</strong>
+                </div>
+              </td>
+              <td style="text-align: center;">
+                {% if i.attachment %}
+                <a href="{{ i.attachment.url }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 11px;">
+                  <i class="bi bi-paperclip"></i> Scan
+                </a>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              {% if not is_approved %}
+              <td style="text-align: right;" class="text-nowrap">
+                <a href="{% url 'imaging_edit' clinical.clinical_id i.id %}" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit Study">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'investigation_delete' 'imaging' i.id %}" class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" onclick="return confirm('Delete this imaging study?');" title="Delete">
+                  <i class="bi bi-trash3"></i>
+                </a>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{% if not is_approved %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
+                No diagnostic imaging studies recorded for this clinical presentation.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    <!-- TAB 3: PATHOLOGY & HISTOLOGY -->
+    {% elif active_tab == 'pathology' %}
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div>
+          <strong class="text-dark" style="font-size: 12px; color: #003366 !important;">
+            🔬 Histopathology, Biopsies, Bone Marrow & Cytology Reports
+          </strong>
+          <div class="text-muted small" style="font-size: 11px;">Tissue diagnosis, IHC profiling (CD99, Synapto, Desmin, Ki67), and surgical specimen pathology.</div>
+        </div>
+        {% if not is_approved %}
+        <a href="{% url 'pathology_add' clinical.clinical_id %}" class="btn-access btn-primary-action">
+          ➕ Add Pathology Report
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive" style="border: 1px solid #bfae95; border-radius: 4px;">
+        <table class="access-table mb-0">
+          <thead>
+            <tr>
+              <th style="width: 110px;">Date</th>
+              <th style="width: 160px;">Specimen & Ref No</th>
+              <th style="width: 160px;">Biopsy Site</th>
+              <th>Microscopic & Gross Findings</th>
+              <th style="width: 240px; color: #b00000;">Histopathological Diagnosis *</th>
+              <th style="width: 100px; text-align: center;">Report</th>
+              {% if not is_approved %}<th style="width: 90px; text-align: right;">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in pathology_tests %}
+            <tr>
+              <td class="fw-semibold text-nowrap">{{ p.path_date|date:"d-M-Y" }}</td>
+              <td>
+                <strong style="color: #003366;">{{ p.specimen_type.name }}</strong>
+                {% if p.lab_reference_no %}
+                  <div class="text-muted font-monospace" style="font-size: 11px;">Ref: {{ p.lab_reference_no }}</div>
+                {% endif %}
+              </td>
+              <td>{{ p.site_of_biopsy|default:"—" }}</td>
+              <td>{{ p.details|linebreaksbr }}</td>
+              <td>
+                <div class="p-1 rounded" style="background: #faf5ed; border: 1px solid #bfae95; font-size: 11.5px;">
+                  <strong class="text-danger-emphasis">{{ p.impression|default:"—" }}</strong>
+                </div>
+              </td>
+              <td style="text-align: center;">
+                {% if p.attachment %}
+                <a href="{{ p.attachment.url }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 11px;">
+                  <i class="bi bi-paperclip"></i> PDF
+                </a>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              {% if not is_approved %}
+              <td style="text-align: right;" class="text-nowrap">
+                <a href="{% url 'pathology_edit' clinical.clinical_id p.id %}" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit Report">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'investigation_delete' 'pathology' p.id %}" class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" onclick="return confirm('Delete this pathology report?');" title="Delete">
+                  <i class="bi bi-trash3"></i>
+                </a>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{% if not is_approved %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
+                No pathology or cytology reports recorded for this clinical presentation.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    <!-- TAB 4: MOLECULAR & CYTOGENETICS -->
+    {% elif active_tab == 'molecular' %}
+      <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <div>
+          <strong class="text-dark" style="font-size: 12px; color: #003366 !important;">
+            🧬 Molecular Genetics, FISH, NGS Panels & Cytogenetic Aberrations
+          </strong>
+          <div class="text-muted small" style="font-size: 11px;">EWSR1 translocations, MYCN amplification, 1p/11q loss, ALK, BRAF, and targeted therapeutic genomic targets.</div>
+        </div>
+        {% if not is_approved %}
+        <a href="{% url 'molecular_add' clinical.clinical_id %}" class="btn-access btn-primary-action">
+          ➕ Add Molecular Test
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="table-responsive" style="border: 1px solid #bfae95; border-radius: 4px;">
+        <table class="access-table mb-0">
+          <thead>
+            <tr>
+              <th style="width: 110px;">Date</th>
+              <th style="width: 160px;">Assay / Test Type</th>
+              <th style="width: 140px;">Lab Reference</th>
+              <th>Genomic & Molecular Findings</th>
+              <th style="width: 240px; color: #b00000;">Biomarker Interpretation *</th>
+              <th style="width: 100px; text-align: center;">Report</th>
+              {% if not is_approved %}<th style="width: 90px; text-align: right;">Actions</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in molecular_tests %}
+            <tr>
+              <td class="fw-semibold text-nowrap">{{ m.test_date|date:"d-M-Y" }}</td>
+              <td><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-2">{{ m.test_type.name }}</span></td>
+              <td>{{ m.lab_reference_no|default:"—" }}</td>
+              <td>{{ m.details|linebreaksbr }}</td>
+              <td>
+                <div class="p-1 rounded" style="background: #faf5ed; border: 1px solid #bfae95; font-size: 11.5px;">
+                  <strong class="text-danger-emphasis">{{ m.impression|default:"—" }}</strong>
+                </div>
+              </td>
+              <td style="text-align: center;">
+                {% if m.attachment %}
+                <a href="{{ m.attachment.url }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 11px;">
+                  <i class="bi bi-paperclip"></i> File
+                </a>
+                {% else %}
+                <span class="text-muted small">—</span>
+                {% endif %}
+              </td>
+              {% if not is_approved %}
+              <td style="text-align: right;" class="text-nowrap">
+                <a href="{% url 'molecular_edit' clinical.clinical_id m.id %}" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Edit Test">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'investigation_delete' 'molecular' m.id %}" class="btn btn-sm btn-outline-danger py-0 px-1 ms-1" onclick="return confirm('Delete this molecular investigation?');" title="Delete">
+                  <i class="bi bi-trash3"></i>
+                </a>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="{% if not is_approved %}7{% else %}6{% endif %}" class="text-center text-muted py-4">
+                No molecular or cytogenetic investigations recorded for this clinical presentation.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

@@ -33,60 +33,72 @@ class District(models.Model):
 
 
 class PrimarySite(models.Model):
-    site = models.CharField(max_length=255, unique=True)
+    site = models.CharField(max_length=255, unique=True, verbose_name="Primary Anatomical Site")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ['site']
+        ordering = ['display_order', 'site']
 
     def __str__(self):
         return self.site
 
 
 class BloodSpecimenType(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="Specimen / Test Type")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ['id']
+        ordering = ['display_order', 'name']
 
     def __str__(self):
         return self.name
 
 
 class ImagingType(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="Imaging Modality")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ['id']
+        ordering = ['display_order', 'name']
 
     def __str__(self):
         return self.name
 
 
 class ImagingSite(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="Anatomical Site")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ['id']
+        ordering = ['display_order', 'name']
 
     def __str__(self):
         return self.name
 
 
 class PathologySpecimenType(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="Pathology Specimen Type")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ['id']
+        ordering = ['display_order', 'name']
 
     def __str__(self):
         return self.name
 
 
 class MolecularTestType(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, unique=True, verbose_name="Molecular Test Type")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ['id']
+        ordering = ['display_order', 'name']
 
     def __str__(self):
         return self.name
@@ -370,7 +382,7 @@ class ImagingInvestigation(models.Model):
     imaging_type = models.ForeignKey(ImagingType, on_delete=models.PROTECT, verbose_name="Modality")
     site = models.ForeignKey(ImagingSite, on_delete=models.PROTECT, verbose_name="Anatomical Site")
     details = models.TextField(verbose_name="Radiology Findings")
-    impression = models.TextField(blank=True, null=True, verbose_name="Impression / Conclusion")
+    impression = models.TextField(default='', verbose_name="Overall Imaging Impression / Conclusion")
     attachment = models.FileField(upload_to='investigations/imaging/', null=True, blank=True, verbose_name="Imaging / Report File")
     linked_to_mdt = models.BooleanField(default=True)
     entered_by = models.CharField(max_length=100, blank=True, null=True)

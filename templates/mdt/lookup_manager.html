@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block title %}Reference Tables Manager - {{ cfg.title }} — Pead MDT{% endblock %}
+
+{% block extra_head %}
+<style>
+  .lookup-sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    font-size: 12px;
+    color: #003366;
+    text-decoration: none;
+    border-bottom: 1px solid #dcd4c6;
+    background: #faf5ed;
+    transition: background 0.15s ease;
+  }
+  .lookup-sidebar-link:hover {
+    background: #ebe0ce;
+    color: #002244;
+  }
+  .lookup-sidebar-link.active {
+    background: #003366;
+    color: #ffffff !important;
+    font-weight: bold;
+  }
+  .sortable-row {
+    cursor: grab;
+  }
+  .sortable-row:active {
+    cursor: grabbing;
+  }
+  .sortable-row.sortable-ghost {
+    opacity: 0.45;
+    background: #e2d5bf !important;
+  }
+  .sortable-row.sortable-chosen {
+    background: #d5c7b0 !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="access-subform shadow-sm">
+  <!-- Header Bar -->
+  <div class="access-subform-header">
+    <div class="d-flex align-items-center gap-2">
+      <span style="font-size: 15px;">⚙️</span>
+      <span class="fw-bold">frmLookupManager: Clinical Dropdown Options & Reference Tables</span>
+      <span class="badge bg-light text-primary border ms-2" style="font-size: 10px; font-weight: bold;">
+        ADMINISTRATOR
+      </span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'dashboard' %}" class="text-white text-decoration-underline small">
+        Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Subform Body -->
+  <div class="access-subform-body p-3">
+    <div class="row g-3">
+      
+      <!-- Category Sidebar (Left Column) -->
+      <div class="col-lg-3 col-md-4 col-12">
+        <div style="border: 1px solid #bfae95; background: #faf5ed; border-radius: 4px; overflow: hidden;">
+          <div style="background: #d5c7b0; padding: 8px 12px; font-weight: bold; font-size: 12px; color: #003366; border-bottom: 1px solid #bfae95;">
+            📋 Reference Categories
+          </div>
+          <div>
+            {% for cat_key, cat_data in lookup_categories.items %}
+              <a href="{% url 'lookup_manager_category' cat_key %}" 
+                 class="lookup-sidebar-link {% if category == cat_key %}active{% endif %}">
+                <span>{{ cat_data.icon }}</span>
+                <span>{{ cat_data.title }}</span>
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Management Panel (Right Column) -->
+      <div class="col-lg-9 col-md-8 col-12">
+        
+        <!-- Category Banner -->
+        <div style="background: #e6dac8; border: 1px solid #bfae95; padding: 10px 14px; margin-bottom: 14px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <span style="font-size: 18px; margin-right: 6px;">{{ cfg.icon }}</span>
+            <strong style="color: #003366; font-size: 14px;">{{ cfg.title }}</strong>
+            <span class="text-secondary small font-monospace ms-2">({{ cfg.table_name }})</span>
+            <div class="text-muted small mt-1" style="font-size: 11px;">
+              {{ cfg.description }}
+            </div>
+          </div>
+          <div>
+            <span class="badge bg-light text-dark border px-2 py-1" style="font-size: 11px;">
+              {{ items|length }} Options Total
+            </span>
+          </div>
+        </div>
+
+        <!-- Add New Option Box -->
+        <fieldset style="border: 1px solid #003366; padding: 12px 14px; margin-bottom: 14px; background: #faf5ed; border-radius: 4px;">
+          <legend style="font-weight: bold; color: #003366; padding: 0 8px; font-size: 12px;">
+            ➕ Add New Option to: <u>{{ cfg.title }}</u>
+          </legend>
+
+          <form method="post" action="{% url 'lookup_add' category %}">
+            {% csrf_token %}
+            <div class="row g-2 align-items-end">
+              <div class="col-md-7 col-12">
+                <label class="access-label fw-bold" style="font-size: 11px;">{{ cfg.name_label }} *</label>
+                <input type="text" name="name_value" class="access-input" required placeholder="Enter option name...">
+              </div>
+
+              <div class="col-md-2 col-6">
+                <label class="access-label" style="font-size: 11px;">Display Order</label>
+                <input type="number" name="display_order" value="{{ items|length|add:1 }}" class="access-input">
+              </div>
+
+              <div class="col-md-1 col-6 d-flex align-items-center pb-1">
+                <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; margin-bottom: 0;">
+                  <input type="checkbox" name="is_active" value="1" checked> Active
+                </label>
+              </div>
+
+              <div class="col-md-2 col-12">
+                <button type="submit" class="btn-access btn-primary-action w-100 py-1" style="font-size: 11px;">
+                  ➕ Add Option
+                </button>
+              </div>
+            </div>
+          </form>
+        </fieldset>
+
+        <!-- Current Options Table Header -->
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fw-bold text-dark" style="font-size: 12px;">
+              Existing Options in Database ({{ items|length }}):
+            </span>
+            <span class="badge bg-secondary-subtle text-secondary border px-2 py-1" style="font-size: 11px;">
+              <i class="bi bi-arrows-move me-1"></i> Drag rows to reorder sequence
+            </span>
+          </div>
+          <span class="text-muted small" style="font-size: 11px;">
+            Active items immediately populate clinical dropdown menus.
+          </span>
+        </div>
+
+        <!-- Table with Sortable Drag-and-Drop Rows -->
+        <div class="table-responsive" style="border: 1px solid #bfae95; border-radius: 4px;">
+          <table class="access-table mb-0" id="lookupSortableTable">
+            <thead>
+              <tr>
+                <th style="width: 80px; text-align: center;">Order ↕</th>
+                <th>Option Name</th>
+                <th style="width: 110px; text-align: center;">Status</th>
+                <th style="width: 150px; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="lookupTableBody">
+              {% for item in items %}
+                <tr data-pk="{{ item.pk }}" class="sortable-row" {% if not item.is_active %}style="opacity: 0.70; background: #eae0ce;"{% endif %}>
+                  <td style="text-align: center;" class="drag-handle text-secondary">
+                    <i class="bi bi-grip-vertical me-1"></i>
+                    <span class="order-badge font-monospace fw-bold">#{{ item.display_order }}</span>
+                  </td>
+                  <td class="fw-semibold text-dark">
+                    {{ item.name }}
+                  </td>
+                  <td style="text-align: center;">
+                    {% if item.is_active %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle px-2" style="font-size: 10px;">
+                        <i class="bi bi-check-circle-fill me-1"></i> Active
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-secondary border px-2" style="font-size: 10px;">
+                        Inactive
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td style="text-align: right;" class="text-nowrap">
+                    <!-- Toggle Active Form -->
+                    <form method="post" action="{% url 'lookup_toggle' category item.pk %}" style="display: inline-block;">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm py-0 px-2 {% if item.is_active %}btn-outline-warning text-dark{% else %}btn-outline-success{% endif %}" style="font-size: 11px;" title="{% if item.is_active %}Deactivate{% else %}Activate{% endif %}">
+                        {% if item.is_active %}<i class="bi bi-pause-circle"></i> Deactivate{% else %}<i class="bi bi-play-circle"></i> Activate{% endif %}
+                      </button>
+                    </form>
+
+                    <!-- Delete Form (Admin Only) -->
+                    {% if user.is_superuser or user.profile.role == 'Admin' %}
+                    <form method="post" action="{% url 'lookup_delete' category item.pk %}" style="display: inline-block;" onsubmit="return confirm('Permanently delete option \'{{ item.name|escapejs }}\'?');">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2 ms-1" style="font-size: 11px;" title="Delete Option">
+                        <i class="bi bi-trash3"></i>
+                      </button>
+                    </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-4">
+                    No options found in this reference category.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Notification Toast for Reorder -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+  <div id="reorderToast" class="toast align-items-center text-bg-success border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body small fw-semibold" id="reorderToastBody">
+        <i class="bi bi-check2-circle me-1"></i> Option order updated successfully.
+      </div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const tableBody = document.getElementById('lookupTableBody');
+  const toastEl = document.getElementById('reorderToast');
+  const toastBody = document.getElementById('reorderToastBody');
+  let toastInstance = null;
+  if (toastEl && typeof bootstrap !== 'undefined') {
+    toastInstance = new bootstrap.Toast(toastEl, { delay: 2500 });
+  }
+
+  function notifyOrder(msg, isError) {
+    if (toastBody) {
+      toastBody.innerHTML = (isError ? '<i class="bi bi-exclamation-triangle me-1"></i> ' : '<i class="bi bi-check2-circle me-1"></i> ') + msg;
+      if (toastEl) {
+        toastEl.className = 'toast align-items-center text-bg-' + (isError ? 'danger' : 'success') + ' border-0 shadow';
+      }
+    }
+    if (toastInstance) toastInstance.show();
+  }
+
+  if (tableBody && typeof Sortable !== 'undefined') {
+    Sortable.create(tableBody, {
+      handle: '.drag-handle',
+      animation: 180,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: function() {
+        const rows = tableBody.querySelectorAll('tr[data-pk]');
+        const orderIds = [];
+        rows.forEach(function(row, idx) {
+          orderIds.push(row.getAttribute('data-pk'));
+          const badge = row.querySelector('.order-badge');
+          if (badge) badge.textContent = '#' + (idx + 1);
+        });
+
+        fetch('{% url "lookup_reorder" category %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ order: orderIds })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.status === 'ok') {
+            notifyOrder('{{ cfg.title }} sequence saved.', false);
+          } else {
+            notifyOrder(data.error || 'Failed to update order.', true);
+          }
+        })
+        .catch(function(err) {
+          notifyOrder('Network error while saving order.', true);
+        });
+      }
+    });
+  }
+});
+</script>
+{% endblock %}
