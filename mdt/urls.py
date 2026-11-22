@@ -34,6 +34,7 @@ urlpatterns = [
     path('users/new/', views.user_create_view, name='user_create'),
     path('users/<int:user_id>/edit/', views.user_edit_view, name='user_edit'),
     path('users/<int:user_id>/toggle-active/', views.user_toggle_active_view, name='user_toggle_active'),
+    path('users/<int:user_id>/toggle-quick-add/', views.user_toggle_quick_add_view, name='user_toggle_quick_add'),
     path('users/<int:user_id>/delete/', views.user_delete_view, name='user_delete'),
     
     # Data Export (Admin / SubAdmin)

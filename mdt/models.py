@@ -136,6 +136,34 @@ class MDTPanelMember(models.Model):
         return self.name
 
 
+class Department(models.Model):
+    name = models.CharField(max_length=255, unique=True, verbose_name="Department Name")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name = "Department"
+        verbose_name_plural = "Departments"
+
+    def __str__(self):
+        return self.name
+
+
+class Designation(models.Model):
+    name = models.CharField(max_length=255, unique=True, verbose_name="Designation")
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name = "Designation"
+        verbose_name_plural = "Designations"
+
+    def __str__(self):
+        return self.name
+
+
 class UserProfile(models.Model):
     ROLE_CHOICES = [
         ('Admin', 'Administrator'),
@@ -152,6 +180,9 @@ class UserProfile(models.Model):
     user_level = models.CharField(max_length=50, blank=True, null=True)
     prefix = models.CharField(max_length=20, default='Dr.', blank=True, null=True)
     full_name = models.CharField(max_length=150, blank=True, null=True)
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+    designation = models.ForeignKey(Designation, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+    in_quick_add_panel = models.BooleanField(default=True, verbose_name="Show in MDT Quick-Add Panel")
 
     def get_display_name(self):
         name = (self.full_name or self.user.get_full_name() or self.user.username).strip()
@@ -164,7 +195,8 @@ class UserProfile(models.Model):
         return name
 
     def __str__(self):
-        return f"{self.get_display_name()} ({self.role})"
+        dept_str = f" - {self.department.name}" if self.department else ""
+        return f"{self.get_display_name()} ({self.role}{dept_str})"
 
 
 

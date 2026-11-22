@@ -73,20 +73,73 @@
                  class="form-control form-control-sm">
         </div>
 
-        <!-- Role Assignment -->
-        <div class="mb-3">
-          <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
-            Assigned Clinical Role <span class="text-danger">*</span>
-          </label>
-          <select name="role" required class="form-select form-select-sm">
-            {% for r_val, r_label in roles %}
-              <option value="{{ r_val }}" {% if target_user and target_user.profile.role == r_val or not target_user and r_val == 'Consultant' %}selected{% endif %}>
-                {{ r_label }} ({{ r_val }})
-              </option>
-            {% endfor %}
-          </select>
-          <div class="form-text" style="font-size: 0.72rem;">
-            Admins & SubAdmins receive administrative deletion, user creation, and audit logging access.
+        <!-- Role, Department & Designation Assignment -->
+        <div class="row g-2 mb-3">
+          <div class="col-md-4 col-sm-12">
+            <label class="form-label form-label-sm fw-bold text-secondary mb-1" style="font-size: 0.8rem;">
+              Role <span class="text-danger">*</span>
+            </label>
+            <select name="role" required class="form-select form-select-sm">
+              {% for r_val, r_label in roles %}
+                <option value="{{ r_val }}" {% if target_user and target_user.profile.role == r_val or not target_user and r_val == 'Consultant' %}selected{% endif %}>
+                  {{ r_label }} ({{ r_val }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 col-sm-6">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label form-label-sm fw-bold text-secondary mb-0" style="font-size: 0.8rem;">
+                Department
+              </label>
+              {% if is_admin %}
+              <a href="{% url 'lookup_manager_category' 'department' %}" target="_blank" class="small text-decoration-none text-muted" style="font-size: 0.7rem;" title="Manage Departments in Lookups">
+                <i class="bi bi-gear-fill"></i> Lookups
+              </a>
+              {% endif %}
+            </div>
+            <select name="department" class="form-select form-select-sm">
+              <option value="">-- None / Select Dept --</option>
+              {% for dept in departments %}
+                <option value="{{ dept.id }}" {% if target_user.profile.department_id == dept.id %}selected{% endif %}>
+                  {{ dept.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 col-sm-6">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label form-label-sm fw-bold text-secondary mb-0" style="font-size: 0.8rem;">
+                Designation
+              </label>
+              {% if is_admin %}
+              <a href="{% url 'lookup_manager_category' 'designation' %}" target="_blank" class="small text-decoration-none text-muted" style="font-size: 0.7rem;" title="Manage Designations in Lookups">
+                <i class="bi bi-gear-fill"></i> Lookups
+              </a>
+              {% endif %}
+            </div>
+            <select name="designation" class="form-select form-select-sm">
+              <option value="">-- None / Select Designation --</option>
+              {% for desig in designations %}
+                <option value="{{ desig.id }}" {% if target_user.profile.designation_id == desig.id %}selected{% endif %}>
+                  {{ desig.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- MDT Quick Add Panel Option -->
+        <div class="mb-3 p-2 bg-light border rounded">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="in_quick_add_panel" id="id_in_quick_add_panel"
+                   {% if not target_user or target_user.profile.in_quick_add_panel %}checked{% endif %}>
+            <label class="form-check-label small fw-semibold text-dark" for="id_in_quick_add_panel">
+              ⭐ Show in MDT Quick-Add Panel
+            </label>
+            <div class="form-text mt-0" style="font-size: 0.72rem;">
+              When checked, this clinician appears as a 1-click chip in the MDT Consensus Form and Live Presentation screen.
+            </div>
           </div>
         </div>
 

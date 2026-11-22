@@ -169,7 +169,7 @@
                   <i class="bi bi-pencil-square me-1"></i> + Custom Name
                 </button>
                 {% if user.is_superuser or user.profile.role == 'Admin' or user.profile.role == 'SubAdmin' %}
-                <a href="{% url 'lookup_manager_category' 'panel_members' %}" target="_blank" class="btn btn-link btn-sm py-0 px-1 text-decoration-none text-muted" style="font-size: 0.72rem;" title="Configure Quick-Add Panel in Reference Lookups">
+                <a href="{% url 'user_list' %}?quick_add=1" target="_blank" class="btn btn-link btn-sm py-0 px-1 text-decoration-none text-muted" style="font-size: 0.72rem;" title="Configure Quick-Add Panel in User Management">
                   <i class="bi bi-gear-fill me-1"></i> Configure Panel
                 </a>
                 {% endif %}
@@ -182,16 +182,26 @@
             {% if not is_approved %}
             <div class="d-flex flex-wrap align-items-center gap-1 mt-1" id="quickAddContainer">
               <span class="fw-semibold text-muted" style="font-size: 0.72rem;">Quick-add panel:</span>
-              {% for pm in panel_members %}
-                <button type="button" class="btn btn-light border btn-sm py-0 px-2 text-dark shadow-sm" style="font-size: 0.72rem;" onclick="addAttendee('{{ pm.name }}')">
-                  + {{ pm.name }}
+              {% for doc in quick_add_users %}
+                <button type="button" class="btn btn-light border btn-sm py-0 px-2 text-dark shadow-sm" style="font-size: 0.72rem;" 
+                        onclick="addAttendee('{{ doc.get_display_name|escapejs }}')" 
+                        title="{{ doc.get_display_name }}{% if doc.department %} ({{ doc.department.name }}){% endif %}{% if doc.designation %} • {{ doc.designation.name }}{% endif %}">
+                  + {{ doc.get_display_name }}
                 </button>
               {% empty %}
-                {% for doc in doctors|slice:":8" %}
-                <button type="button" class="btn btn-light border btn-sm py-0 px-1 text-dark" style="font-size: 0.7rem;" onclick="addAttendee('{{ doc.full_name|default:doc.user.username }}')">
-                  + {{ doc.full_name|default:doc.user.username }}
+                {% for doc in doctors|slice:":12" %}
+                <button type="button" class="btn btn-light border btn-sm py-0 px-2 text-dark shadow-sm" style="font-size: 0.72rem;" 
+                        onclick="addAttendee('{{ doc.get_display_name|escapejs }}')">
+                  + {{ doc.get_display_name }}
                 </button>
                 {% endfor %}
+              {% endfor %}
+              {% for pm in panel_members %}
+                <button type="button" class="btn btn-light border btn-sm py-0 px-2 text-dark shadow-sm" style="font-size: 0.72rem;" 
+                        onclick="addAttendee('{{ pm.name|escapejs }}')" 
+                        title="{% if pm.specialty %}{{ pm.name }} ({{ pm.specialty }}){% else %}{{ pm.name }}{% endif %}">
+                  + {{ pm.name }}
+                </button>
               {% endfor %}
             </div>
             {% endif %}
@@ -290,7 +300,7 @@
 <!-- Modal: Select Consultants & Users (Multi-selection) -->
 {% if not is_approved %}
 <div class="modal fade" id="modalSelectUsers" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content shadow">
       <div class="modal-header bg-primary text-white py-2">
         <h6 class="modal-title small fw-bold mb-0">
@@ -300,23 +310,34 @@
       </div>
       <div class="modal-body p-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="small text-muted">Select attending specialists (multi-selection):</span>
+          <span class="small text-muted">Select attending specialists across departments:</span>
           <div class="btn-group btn-group-sm">
             <button type="button" class="btn btn-outline-secondary py-0 px-2" style="font-size: 0.72rem;" onclick="toggleAllUsers(true)">Select All</button>
             <button type="button" class="btn btn-outline-secondary py-0 px-2" style="font-size: 0.72rem;" onclick="toggleAllUsers(false)">Clear</button>
           </div>
         </div>
-        <div class="list-group list-group-flush border rounded" style="max-height: 260px; overflow-y: auto;">
+        <div class="mb-2">
+          <input type="text" id="userModalSearch" class="form-control form-control-sm" placeholder="🔍 Search doctors by name, department, designation..." oninput="filterModalUsers(this.value)">
+        </div>
+        <div class="list-group list-group-flush border rounded" id="modalUsersList" style="max-height: 280px; overflow-y: auto;">
           {% for doc in doctors %}
-          <label class="list-group-item list-group-item-action py-2 px-3 d-flex align-items-center justify-content-between cursor-pointer">
+          <label class="list-group-item list-group-item-action py-2 px-3 d-flex align-items-center justify-content-between cursor-pointer modal-user-item" data-search="{{ doc.get_display_name|lower }} {{ doc.user.username|lower }} {{ doc.department.name|default:''|lower }} {{ doc.designation.name|default:''|lower }} {{ doc.role|lower }}">
             <div class="d-flex align-items-center">
-              <input type="checkbox" class="form-check-input me-2 user-attendee-cb" value="{{ doc.full_name|default:doc.user.username }} ({{ doc.role }})">
+              <input type="checkbox" class="form-check-input me-2 user-attendee-cb" value="{{ doc.get_display_name }}">
               <div>
-                <strong class="text-dark small">{{ doc.full_name|default:doc.user.username }}</strong>
+                <strong class="text-dark small">{{ doc.get_display_name }}</strong>
                 <span class="text-muted small ms-1">@{{ doc.user.username }}</span>
               </div>
             </div>
-            <span class="badge bg-light text-secondary border small">{{ doc.role }}</span>
+            <div class="d-flex align-items-center gap-1">
+              {% if doc.department %}
+                <span class="badge bg-secondary-subtle text-dark border small" style="font-size: 0.7rem;">{{ doc.department.name }}</span>
+              {% endif %}
+              {% if doc.designation %}
+                <span class="badge bg-light text-secondary border small" style="font-size: 0.7rem;">{{ doc.designation.name }}</span>
+              {% endif %}
+              <span class="badge bg-primary-subtle text-primary border small" style="font-size: 0.7rem;">{{ doc.role }}</span>
+            </div>
           </label>
           {% empty %}
           <div class="text-muted text-center py-3 small">No registered doctor accounts found.</div>
@@ -386,7 +407,25 @@ function addAttendee(name) {
 }
 
 function toggleAllUsers(check) {
-  document.querySelectorAll('.user-attendee-cb').forEach(cb => cb.checked = check);
+  document.querySelectorAll('.user-attendee-cb').forEach(cb => {
+    // Only toggle visible items if search is active
+    const parent = cb.closest('.modal-user-item');
+    if (!parent || parent.style.display !== 'none') {
+      cb.checked = check;
+    }
+  });
+}
+
+function filterModalUsers(query) {
+  const q = (query || '').toLowerCase().trim();
+  document.querySelectorAll('.modal-user-item').forEach(item => {
+    const text = item.getAttribute('data-search') || '';
+    if (!q || text.includes(q)) {
+      item.style.setProperty('display', 'flex', 'important');
+    } else {
+      item.style.setProperty('display', 'none', 'important');
+    }
+  });
 }
 
 function addSelectedUsers() {

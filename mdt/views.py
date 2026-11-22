@@ -17,7 +17,7 @@ from django.db.models import Q
 from .models import (
     Patient, ClinicalDetails, MDTConsensus, State, District, PrimarySite,
     BloodInvestigation, ImagingInvestigation, PathologyInvestigation, MolecularInvestigation,
-    AuditLog, UserProfile, DiscussionPurpose, MDTPanelMember
+    AuditLog, UserProfile, DiscussionPurpose, MDTPanelMember, Department, Designation
 )
 from .forms import (
     PatientForm, ClinicalDetailsForm, MDTConsensusForm,
@@ -615,7 +615,13 @@ def consensus_edit(request, consensus_id):
         form = MDTConsensusForm(instance=consensus)
 
     investigations = get_consolidated_investigations(clinical)
-    doctors = UserProfile.objects.filter(role__in=['Consultant', 'Resident', 'Admin', 'SubAdmin']).select_related('user').order_by('full_name')
+    quick_add_users = UserProfile.objects.filter(
+        in_quick_add_panel=True,
+        user__is_active=True
+    ).select_related('user', 'department', 'designation').order_by('full_name', 'user__username')
+    doctors = UserProfile.objects.filter(
+        user__is_active=True
+    ).select_related('user', 'department', 'designation').order_by('full_name', 'user__username')
     panel_members = MDTPanelMember.objects.filter(is_active=True).order_by('display_order', 'name')
 
     context = {
@@ -626,6 +632,7 @@ def consensus_edit(request, consensus_id):
         'is_approved': is_approved,
         'investigations': investigations,
         'doctors': doctors,
+        'quick_add_users': quick_add_users,
         'panel_members': panel_members,
     }
     return render(request, 'mdt/consensus_form.html', context)
@@ -654,7 +661,13 @@ def live_presentation(request, consensus_id):
         messages.success(request, "Real-time meeting notes updated.")
         return redirect('live_presentation', consensus_id=consensus.consensus_id)
 
-    doctors = UserProfile.objects.filter(role__in=['Consultant', 'Resident', 'Admin', 'SubAdmin']).select_related('user').order_by('full_name')
+    quick_add_users = UserProfile.objects.filter(
+        in_quick_add_panel=True,
+        user__is_active=True
+    ).select_related('user', 'department', 'designation').order_by('full_name', 'user__username')
+    doctors = UserProfile.objects.filter(
+        user__is_active=True
+    ).select_related('user', 'department', 'designation').order_by('full_name', 'user__username')
     panel_members = MDTPanelMember.objects.filter(is_active=True).order_by('display_order', 'name')
 
     context = {
@@ -663,6 +676,7 @@ def live_presentation(request, consensus_id):
         'patient': patient,
         'investigations': investigations,
         'doctors': doctors,
+        'quick_add_users': quick_add_users,
         'panel_members': panel_members,
     }
     return render(request, 'mdt/live_presentation.html', context)
@@ -925,20 +939,32 @@ def user_list_view(request):
 
     query = request.GET.get('q', '').strip()
     role_filter = request.GET.get('role', '').strip()
+    dept_filter = request.GET.get('department', '').strip()
     status_filter = request.GET.get('status', '').strip()
+    quick_add_filter = request.GET.get('quick_add', '').strip()
 
-    users_qs = User.objects.select_related('profile').order_by('username')
+    users_qs = User.objects.select_related('profile', 'profile__department', 'profile__designation').order_by('username')
 
     if query:
         users_qs = users_qs.filter(
             Q(username__icontains=query) |
             Q(first_name__icontains=query) |
             Q(last_name__icontains=query) |
-            Q(profile__full_name__icontains=query)
+            Q(profile__full_name__icontains=query) |
+            Q(profile__department__name__icontains=query) |
+            Q(profile__designation__name__icontains=query)
         )
 
     if role_filter:
         users_qs = users_qs.filter(profile__role=role_filter)
+
+    if dept_filter:
+        users_qs = users_qs.filter(profile__department_id=dept_filter)
+
+    if quick_add_filter == '1':
+        users_qs = users_qs.filter(profile__in_quick_add_panel=True)
+    elif quick_add_filter == '0':
+        users_qs = users_qs.filter(profile__in_quick_add_panel=False)
 
     if status_filter == 'active':
         users_qs = users_qs.filter(is_active=True)
@@ -948,12 +974,16 @@ def user_list_view(request):
     total_count = users_qs.count()
     active_count = User.objects.filter(is_active=True).count()
     inactive_count = User.objects.filter(is_active=False).count()
+    departments = Department.objects.filter(is_active=True)
 
     context = {
         'users': users_qs,
         'roles': UserProfile.ROLE_CHOICES,
+        'departments': departments,
         'query': query,
         'selected_role': role_filter,
+        'selected_dept': dept_filter,
+        'quick_add_filter': quick_add_filter,
         'status_filter': status_filter,
         'is_admin': is_admin_only(request.user),
         'total_count': total_count,
@@ -971,6 +1001,8 @@ def user_create_view(request):
 
     roles = UserProfile.ROLE_CHOICES
     prefixes = ['Dr.', 'Mr', 'Mrs', 'Ms', 'Prof.']
+    departments = Department.objects.filter(is_active=True)
+    designations = Designation.objects.filter(is_active=True)
 
     if request.method == 'POST':
         uname = request.POST.get('username', '').strip().lower()
@@ -979,14 +1011,23 @@ def user_create_view(request):
         email = request.POST.get('email', '').strip()
         pword = request.POST.get('password', '').strip()
         role = request.POST.get('role', 'Consultant').strip()
+        dept_id = request.POST.get('department', '').strip()
+        desig_id = request.POST.get('designation', '').strip()
+        in_quick_add = (request.POST.get('in_quick_add_panel') == 'on')
 
         if not uname or not pword:
             messages.error(request, "Username and Password are required.")
-            return render(request, 'mdt/user_form.html', {'roles': roles, 'prefixes': prefixes})
+            return render(request, 'mdt/user_form.html', {
+                'roles': roles, 'prefixes': prefixes,
+                'departments': departments, 'designations': designations
+            })
 
         if User.objects.filter(username__iexact=uname).exists():
             messages.error(request, f"Username '{uname}' already exists. Please choose a different username.")
-            return render(request, 'mdt/user_form.html', {'roles': roles, 'prefixes': prefixes})
+            return render(request, 'mdt/user_form.html', {
+                'roles': roles, 'prefixes': prefixes,
+                'departments': departments, 'designations': designations
+            })
 
         is_staff = role in ['Admin', 'SubAdmin']
         is_superuser = (role == 'Admin')
@@ -1000,13 +1041,19 @@ def user_create_view(request):
             is_superuser=is_superuser
         )
 
+        dept_obj = Department.objects.filter(id=dept_id).first() if dept_id else None
+        desig_obj = Designation.objects.filter(id=desig_id).first() if desig_id else None
+
         UserProfile.objects.update_or_create(
             user=user,
             defaults={
                 'prefix': prefix,
                 'full_name': fname,
                 'role': role,
-                'user_level': role.upper()
+                'user_level': role.upper(),
+                'department': dept_obj,
+                'designation': desig_obj,
+                'in_quick_add_panel': in_quick_add,
             }
         )
 
@@ -1015,13 +1062,17 @@ def user_create_view(request):
             "USER_CREATE",
             "tblUsers",
             uname,
-            f"Created user account '{uname}' ({prefix} {fname}) with role '{role}'."
+            f"Created user account '{uname}' ({prefix} {fname}) with role '{role}', dept '{dept_obj}', desig '{desig_obj}'."
         )
 
         messages.success(request, f"User account '{prefix} {fname or uname}' created successfully with role '{role}'.")
         return redirect('user_list')
 
-    return render(request, 'mdt/user_form.html', {'roles': roles, 'prefixes': prefixes, 'target_user': None})
+    return render(request, 'mdt/user_form.html', {
+        'roles': roles, 'prefixes': prefixes,
+        'departments': departments, 'designations': designations,
+        'target_user': None
+    })
 
 
 @login_required
@@ -1030,9 +1081,11 @@ def user_edit_view(request, user_id):
         messages.error(request, "Access restricted to Administrators.")
         return redirect('dashboard')
 
-    target_user = get_object_or_404(User, id=user_id)
+    target_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
     roles = UserProfile.ROLE_CHOICES
     prefixes = ['Dr.', 'Mr', 'Mrs', 'Ms', 'Prof.']
+    departments = Department.objects.filter(is_active=True)
+    designations = Designation.objects.filter(is_active=True)
     is_admin = is_admin_only(request.user)
 
     if request.method == 'POST':
@@ -1040,6 +1093,9 @@ def user_edit_view(request, user_id):
         fname = request.POST.get('first_name', '').strip()
         email = request.POST.get('email', '').strip()
         role = request.POST.get('role', 'Consultant').strip()
+        dept_id = request.POST.get('department', '').strip()
+        desig_id = request.POST.get('designation', '').strip()
+        in_quick_add = (request.POST.get('in_quick_add_panel') == 'on')
         new_pwd = request.POST.get('password', '').strip()
 
         target_user.first_name = fname
@@ -1059,11 +1115,17 @@ def user_edit_view(request, user_id):
 
         target_user.save()
 
+        dept_obj = Department.objects.filter(id=dept_id).first() if dept_id else None
+        desig_obj = Designation.objects.filter(id=desig_id).first() if desig_id else None
+
         profile, _ = UserProfile.objects.get_or_create(user=target_user)
         profile.prefix = prefix
         profile.full_name = fname
         profile.role = role
         profile.user_level = role.upper()
+        profile.department = dept_obj
+        profile.designation = desig_obj
+        profile.in_quick_add_panel = in_quick_add
         profile.save()
 
         write_audit_log(
@@ -1071,7 +1133,7 @@ def user_edit_view(request, user_id):
             "USER_EDIT",
             "tblUsers",
             target_user.username,
-            f"Updated user account '{target_user.username}' (Name: {prefix} {fname}, Role: {role}, Active: {target_user.is_active})."
+            f"Updated user account '{target_user.username}' (Name: {prefix} {fname}, Role: {role}, Dept: {dept_obj}, Desig: {desig_obj}, Active: {target_user.is_active})."
         )
 
         messages.success(request, f"User account '{target_user.username}' updated successfully.")
@@ -1081,8 +1143,30 @@ def user_edit_view(request, user_id):
         'target_user': target_user,
         'roles': roles,
         'prefixes': prefixes,
+        'departments': departments,
+        'designations': designations,
         'is_admin': is_admin,
     })
+
+
+@login_required
+def user_toggle_quick_add_view(request, user_id):
+    if not is_admin_user(request.user):
+        messages.error(request, "Access restricted to Administrators.")
+        return redirect('user_list')
+
+    target_user = get_object_or_404(User.objects.select_related('profile'), id=user_id)
+    profile, _ = UserProfile.objects.get_or_create(user=target_user)
+    profile.in_quick_add_panel = not profile.in_quick_add_panel
+    profile.save()
+
+    status_str = "added to" if profile.in_quick_add_panel else "removed from"
+    messages.success(request, f"User '{profile.get_display_name()}' has been {status_str} the MDT Quick-Add panel.")
+    
+    ref = request.META.get('HTTP_REFERER')
+    if ref:
+        return redirect(ref)
+    return redirect('user_list')
 
 
 @login_required

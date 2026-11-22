@@ -618,6 +618,98 @@ class PeadMDTTests(TestCase):
         self.assertContains(resp_cons, 'Select Users')
         self.assertContains(resp_cons, 'Custom Name')
 
+    def test_user_department_designation_and_quick_add(self):
+        """
+        Verify:
+        1. Department and Designation lookup models.
+        2. UserProfile has department and designation foreign keys, and in_quick_add_panel boolean.
+        3. User creation and update with department and designation.
+        4. user_toggle_quick_add view toggles quick add status.
+        5. Consensus view renders quick-add chips for users (e.g. Dr. Govardhan).
+        """
+        from .models import Department, Designation
+
+        rad_onc = Department.objects.create(name='Radiation Oncology', display_order=1)
+        surg_onc = Department.objects.create(name='Surgical Oncology', display_order=2)
+        prof_desig = Designation.objects.create(name='Professor', display_order=1)
+        cons_desig = Designation.objects.create(name='Consultant', display_order=2)
+
+        # Create user with department and designation
+        doc_user = User.objects.create_user(
+            username='dr_govardhan',
+            password='password123',
+            first_name='Dr. Govardhan'
+        )
+        profile = UserProfile.objects.create(
+            user=doc_user,
+            prefix='Dr.',
+            full_name='Dr. Govardhan',
+            role='Consultant',
+            department=rad_onc,
+            designation=cons_desig,
+            in_quick_add_panel=True
+        )
+        self.assertEqual(profile.get_display_name(), 'Dr. Govardhan')
+        self.assertEqual(profile.department.name, 'Radiation Oncology')
+        self.assertEqual(profile.designation.name, 'Consultant')
+        self.assertTrue(profile.in_quick_add_panel)
+
+        # Login as Admin to access Reference Lookups and User Management
+        self.client.login(username='adminuser', password='password123')
+
+        # Check Department and Designation in Reference Lookups
+        resp_dept = self.client.get(reverse('lookup_manager_category', args=['department']))
+        self.assertEqual(resp_dept.status_code, 200)
+        self.assertContains(resp_dept, 'Radiation Oncology')
+        self.assertContains(resp_dept, 'Surgical Oncology')
+
+        resp_desig = self.client.get(reverse('lookup_manager_category', args=['designation']))
+        self.assertEqual(resp_desig.status_code, 200)
+        self.assertContains(resp_desig, 'Professor')
+        self.assertContains(resp_desig, 'Consultant')
+
+        # Check User List contains Department, Designation, and Quick-Add badge
+        resp_users = self.client.get(reverse('user_list'))
+        self.assertEqual(resp_users.status_code, 200)
+        self.assertContains(resp_users, 'Dr. Govardhan')
+        self.assertContains(resp_users, 'Radiation Oncology')
+        self.assertContains(resp_users, 'In Panel')
+
+        # Test toggle quick-add endpoint
+        resp_toggle = self.client.get(reverse('user_toggle_quick_add', args=[doc_user.id]))
+        self.assertEqual(resp_toggle.status_code, 302)
+        profile.refresh_from_db()
+        self.assertFalse(profile.in_quick_add_panel)
+
+        # Toggle back on
+        self.client.get(reverse('user_toggle_quick_add', args=[doc_user.id]))
+        profile.refresh_from_db()
+        self.assertTrue(profile.in_quick_add_panel)
+
+        # Switch back to doctor user for clinical consensus form
+        self.client.login(username='drtest', password='password123')
+
+        # Test Consensus view renders + Dr. Govardhan chip
+        clin = ClinicalDetails.objects.create(
+            patient=self.patient,
+            height=90.0,
+            weight=14.0,
+            diagnosis='Neuroblastoma',
+            status='Scheduled',
+            date_mdt_planned=date.today()
+        )
+        consensus = MDTConsensus.objects.create(
+            clinical_details=clin,
+            mdt_id='PED20260000099',
+            status='Draft'
+        )
+
+        resp_cons = self.client.get(reverse('consensus_edit', args=[consensus.consensus_id]))
+        self.assertEqual(resp_cons.status_code, 200)
+        self.assertContains(resp_cons, 'Dr. Govardhan')
+        self.assertContains(resp_cons, 'Quick-add panel:')
+
+
 
 
 

@@ -1,9 +1,30 @@
 from .models import (
     DiscussionPurpose, PrimarySite, BloodSpecimenType,
-    ImagingType, ImagingSite, PathologySpecimenType, MolecularTestType, MDTPanelMember
+    ImagingType, ImagingSite, PathologySpecimenType, MolecularTestType, MDTPanelMember,
+    Department, Designation
 )
 
 LOOKUP_CONFIG = {
+    'department': {
+        'title': 'Hospital & Oncology Departments',
+        'icon': '🏢',
+        'table_name': 'tblDepartment',
+        'model': Department,
+        'pk': 'id',
+        'name_field': 'name',
+        'name_label': 'Department Name (e.g. Radiation Oncology, Peadiatric Oncology, Peadiatric Surgery, Radiology)',
+        'description': 'Clinical, surgical, and diagnostic departments for specialists and participating panel members.',
+    },
+    'designation': {
+        'title': 'Academic & Clinical Designations',
+        'icon': '🎓',
+        'table_name': 'tblDesignation',
+        'model': Designation,
+        'pk': 'id',
+        'name_field': 'name',
+        'name_label': 'Designation Title (e.g. Professor, Associate Professor, Assistant Professor, Consultant)',
+        'description': 'Professional ranks and academic designations assigned to clinical users.',
+    },
     'purpose': {
         'title': 'MDT Discussion Purposes',
         'icon': '🏷️',

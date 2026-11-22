@@ -117,7 +117,17 @@
             {% csrf_token %}
             <div class="mb-2">
               <label class="form-label-compact">Attending Specialists:</label>
-              <input type="text" name="attendees" value="{{ consensus.attendees|default:'' }}" class="form-control form-control-sm" placeholder="e.g. Dr. A (Med Onc), Dr. B (Surg), Dr. C (Rad)">
+              <input type="text" id="live_attendees" name="attendees" value="{{ consensus.attendees|default:'' }}" class="form-control form-control-sm" placeholder="e.g. Dr. Govardhan, Dr. V Lokesh">
+              {% if quick_add_users %}
+              <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+                <span class="text-muted fw-semibold" style="font-size: 0.7rem;">Quick-add:</span>
+                {% for doc in quick_add_users|slice:":12" %}
+                <button type="button" class="btn btn-light border btn-sm py-0 px-2 text-dark shadow-sm" style="font-size: 0.7rem;" onclick="addLiveAttendee('{{ doc.get_display_name|escapejs }}')" title="{{ doc.get_display_name }}{% if doc.department %} ({{ doc.department.name }}){% endif %}{% if doc.designation %} • {{ doc.designation.name }}{% endif %}">
+                  + {{ doc.get_display_name }}
+                </button>
+                {% endfor %}
+              </div>
+              {% endif %}
             </div>
 
             <div class="mb-2">
@@ -146,4 +156,19 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function addLiveAttendee(name) {
+  const input = document.getElementById('live_attendees');
+  if (!input) return;
+  const current = input.value.trim();
+  if (!current) {
+    input.value = name;
+  } else if (!current.includes(name)) {
+    input.value = current + ', ' + name;
+  }
+}
+</script>
 {% endblock %}

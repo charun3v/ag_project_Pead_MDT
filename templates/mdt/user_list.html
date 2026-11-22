@@ -29,8 +29,20 @@
       <div class="col-auto">
         <label class="col-form-label col-form-label-sm fw-semibold text-secondary py-0" style="font-size: 0.78rem;">Search:</label>
       </div>
-      <div class="col-md-3 col-sm-6">
-        <input type="text" name="q" value="{{ query }}" placeholder="Username or doctor name..." class="form-control form-control-sm">
+      <div class="col-md-2 col-sm-6">
+        <input type="text" name="q" value="{{ query }}" placeholder="Username, name, dept..." class="form-control form-control-sm">
+      </div>
+
+      <div class="col-auto">
+        <label class="col-form-label col-form-label-sm fw-semibold text-secondary py-0" style="font-size: 0.78rem;">Department:</label>
+      </div>
+      <div class="col-md-2 col-sm-4">
+        <select name="department" class="form-select form-select-sm">
+          <option value="">-- All Departments --</option>
+          {% for dept in departments %}
+            <option value="{{ dept.id }}" {% if selected_dept == dept.id|stringformat:"s" %}selected{% endif %}>{{ dept.name }}</option>
+          {% endfor %}
+        </select>
       </div>
 
       <div class="col-auto">
@@ -46,13 +58,24 @@
       </div>
 
       <div class="col-auto">
+        <label class="col-form-label col-form-label-sm fw-semibold text-secondary py-0" style="font-size: 0.78rem;">Quick-Add:</label>
+      </div>
+      <div class="col-auto">
+        <select name="quick_add" class="form-select form-select-sm" style="width: 120px;">
+          <option value="">-- All --</option>
+          <option value="1" {% if quick_add_filter == '1' %}selected{% endif %}>⭐ In Panel</option>
+          <option value="0" {% if quick_add_filter == '0' %}selected{% endif %}>☆ Not in Panel</option>
+        </select>
+      </div>
+
+      <div class="col-auto">
         <label class="col-form-label col-form-label-sm fw-semibold text-secondary py-0" style="font-size: 0.78rem;">Status:</label>
       </div>
-      <div class="col-md-2 col-sm-4">
-        <select name="status" class="form-select form-select-sm">
-          <option value="">-- All Status --</option>
-          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active Only</option>
-          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive Only</option>
+      <div class="col-auto">
+        <select name="status" class="form-select form-select-sm" style="width: 110px;">
+          <option value="">-- All --</option>
+          <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
         </select>
       </div>
 
@@ -60,14 +83,14 @@
         <button type="submit" class="btn btn-primary btn-sm py-1 px-2" style="font-size: 0.78rem;">
           <i class="bi bi-filter me-1"></i> Filter
         </button>
-        {% if query or selected_role or status_filter %}
+        {% if query or selected_role or selected_dept or quick_add_filter or status_filter %}
         <a href="{% url 'user_list' %}" class="btn btn-outline-secondary btn-sm py-1 px-2" style="font-size: 0.78rem;">
           Reset
         </a>
         {% endif %}
       </div>
 
-      <div class="col text-end d-none d-md-block">
+      <div class="col text-end d-none d-xl-block">
         <span class="badge bg-secondary-subtle text-secondary border px-2 py-1" style="font-size: 0.75rem;">
           Total: <strong>{{ total_count }}</strong> (Active: {{ active_count }}, Inactive: {{ inactive_count }})
         </span>
@@ -79,13 +102,15 @@
       <table class="table table-compact table-hover align-middle mb-0">
         <thead class="table-dark">
           <tr style="font-size: 0.78rem;">
-            <th style="width: 40px; text-align: center;">#</th>
+            <th style="width: 35px; text-align: center;">#</th>
             <th>Username</th>
-            <th>Prefix & Doctor / Staff Name</th>
+            <th>Doctor / Staff Name</th>
+            <th>Department</th>
+            <th>Designation</th>
             <th>Role</th>
-            <th>User Level</th>
+            <th style="text-align: center;">Quick-Add</th>
             <th style="text-align: center;">Status</th>
-            <th style="text-align: right; width: 180px;">Actions</th>
+            <th style="text-align: right; width: 170px;">Actions</th>
           </tr>
         </thead>
         <tbody style="font-size: 0.82rem;">
@@ -105,6 +130,20 @@
               {% endif %}
             </td>
             <td>
+              {% if u.profile.department %}
+                <span class="badge bg-secondary-subtle text-dark border" style="font-size: 0.72rem;">{{ u.profile.department.name }}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.profile.designation %}
+                <span class="badge bg-light text-secondary border" style="font-size: 0.72rem;">{{ u.profile.designation.name }}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td>
               {% if u.profile.role == 'Admin' %}
                 <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2">Admin</span>
               {% elif u.profile.role == 'SubAdmin' %}
@@ -117,10 +156,16 @@
                 <span class="badge bg-light text-dark border px-2">{{ u.profile.role|default:"User" }}</span>
               {% endif %}
             </td>
-            <td>
-              <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.72rem;">
-                {{ u.profile.user_level|default:"USER" }}
-              </span>
+            <td style="text-align: center;">
+              {% if u.profile.in_quick_add_panel %}
+                <a href="{% url 'user_toggle_quick_add' u.id %}" class="badge bg-warning-subtle text-dark border border-warning text-decoration-none py-1 px-2" title="In MDT Quick-Add panel. Click to hide.">
+                  ⭐ In Panel
+                </a>
+              {% else %}
+                <a href="{% url 'user_toggle_quick_add' u.id %}" class="badge bg-light text-muted border text-decoration-none py-1 px-2" title="Hidden from Quick-Add. Click to show in panel.">
+                  ☆ Hidden
+                </a>
+              {% endif %}
             </td>
             <td style="text-align: center;">
               {% if u.is_active %}
@@ -153,7 +198,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-4">
+            <td colspan="9" class="text-center text-muted py-4">
               <i class="bi bi-person-x fs-3 d-block mb-1"></i>
               No user accounts found matching current search/filter.
             </td>
