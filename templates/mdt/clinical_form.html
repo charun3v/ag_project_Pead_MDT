@@ -632,19 +632,27 @@
 
         <div class="d-flex justify-content-between align-items-center mb-1">
           <label class="form-label-compact mb-0 fw-semibold text-secondary">Active Discussion Purposes</label>
-          <a href="{% url 'manage_purposes' %}" target="_blank" class="small text-primary text-decoration-none fw-semibold">
-            Full Management Page <i class="bi bi-box-arrow-up-right"></i>
-          </a>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary-subtle text-secondary border px-1" style="font-size: 0.68rem;">
+              <i class="bi bi-arrows-move me-1"></i> Drag to reorder
+            </span>
+            <a href="{% url 'manage_purposes' %}" target="_blank" class="small text-primary text-decoration-none fw-semibold" style="font-size: 0.75rem;">
+              Full Page <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+          </div>
         </div>
-        <div class="border rounded p-2 bg-light" style="max-height: 200px; overflow-y: auto;">
+        <div class="border rounded p-2 bg-light" style="max-height: 220px; overflow-y: auto;">
           <ul class="list-group list-group-flush small" id="purposeList">
             {% for p in discussion_purposes %}
-              <li class="list-group-item bg-transparent py-1 px-2 d-flex justify-content-between align-items-center">
-                <span>{{ p.name }}</span>
-                <span class="badge bg-secondary-subtle text-secondary font-monospace" style="font-size: 0.68rem;">#{{ p.display_order }}</span>
+              <li class="list-group-item bg-transparent py-1 px-2 d-flex justify-content-between align-items-center" data-id="{{ p.purpose_id }}">
+                <span class="d-flex align-items-center">
+                  <i class="bi bi-grip-vertical text-secondary drag-handle me-2" style="cursor: grab;" title="Drag to reorder"></i>
+                  <span class="purpose-name-text">{{ p.name }}</span>
+                </span>
+                <span class="badge bg-secondary-subtle text-secondary font-monospace order-num" style="font-size: 0.68rem;">#{{ p.display_order }}</span>
               </li>
             {% empty %}
-              <li class="list-group-item bg-transparent text-muted py-2 text-center">No purposes found</li>
+              <li class="list-group-item bg-transparent text-muted py-2 text-center empty-msg">No purposes found</li>
             {% endfor %}
           </ul>
         </div>
@@ -663,6 +671,59 @@ document.addEventListener('DOMContentLoaded', function() {
   const alertBox = document.getElementById('purposeAlert');
   const purposeSelect = document.getElementById('id_discussion_purpose');
   const purposeList = document.getElementById('purposeList');
+
+  // Drag and drop reordering via SortableJS
+  if (purposeList && typeof Sortable !== 'undefined') {
+    Sortable.create(purposeList, {
+      handle: '.drag-handle',
+      animation: 180,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: function() {
+        const items = purposeList.querySelectorAll('li[data-id]');
+        const orderIds = [];
+        items.forEach(function(item, idx) {
+          orderIds.push(item.getAttribute('data-id'));
+          const numSpan = item.querySelector('.order-num');
+          if (numSpan) numSpan.textContent = '#' + (idx + 1);
+        });
+
+        // Dynamically reorder options in the select dropdown to match
+        if (purposeSelect) {
+          const currentVal = purposeSelect.value;
+          orderIds.forEach(function(id) {
+            const opt = purposeSelect.querySelector('option[value="' + id + '"]');
+            if (opt) {
+              purposeSelect.appendChild(opt);
+            }
+          });
+          purposeSelect.value = currentVal;
+        }
+
+        // Persist new order via AJAX
+        fetch('{% url "api_reorder_discussion_purposes" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ order: orderIds })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.status === 'ok') {
+            showAlert('✓ Purpose order updated and applied to dropdown.', 'success');
+          } else {
+            showAlert(data.error || 'Failed to update order.', 'danger');
+          }
+        })
+        .catch(function() {
+          showAlert('Network error while saving purpose sequence.', 'danger');
+        });
+      }
+    });
+  }
 
   if (btnAdd && inputName) {
     btnAdd.addEventListener('click', function() {
@@ -701,10 +762,21 @@ document.addEventListener('DOMContentLoaded', function() {
           opt.selected = true;
           purposeSelect.appendChild(opt);
 
-          // Add to list in modal
+          // Add to list in modal with drag handle and data-id
+          const emptyMsg = purposeList.querySelector('.empty-msg');
+          if (emptyMsg) emptyMsg.remove();
+
+          const count = purposeList.querySelectorAll('li[data-id]').length + 1;
           const li = document.createElement('li');
           li.className = 'list-group-item bg-transparent py-1 px-2 d-flex justify-content-between align-items-center';
-          li.innerHTML = `<span>${data.name}</span> <span class="badge bg-success-subtle text-success">New</span>`;
+          li.setAttribute('data-id', data.id);
+          li.innerHTML = `
+            <span class="d-flex align-items-center">
+              <i class="bi bi-grip-vertical text-secondary drag-handle me-2" style="cursor: grab;" title="Drag to reorder"></i>
+              <span class="purpose-name-text">${data.name}</span>
+            </span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace order-num" style="font-size: 0.68rem;">#${count} (New)</span>
+          `;
           purposeList.appendChild(li);
 
           inputName.value = '';

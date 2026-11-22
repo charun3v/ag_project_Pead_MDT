@@ -685,6 +685,46 @@ def api_add_discussion_purpose(request):
     return JsonResponse({'error': 'POST method required'}, status=405)
 
 
+@login_required
+def api_reorder_discussion_purposes(request):
+    if not is_admin_user(request.user):
+        return JsonResponse({'error': 'Access denied: Administrators only'}, status=403)
+
+    if request.method == 'POST':
+        order_ids = []
+        try:
+            if request.body:
+                data = json.loads(request.body)
+                order_ids = data.get('order', [])
+        except Exception:
+            pass
+
+        if not order_ids:
+            order_ids = request.POST.getlist('order') or request.POST.getlist('order[]')
+
+        if not order_ids:
+            return JsonResponse({'error': 'No order sequence provided'}, status=400)
+
+        with transaction.atomic():
+            for idx, pid in enumerate(order_ids, start=1):
+                try:
+                    DiscussionPurpose.objects.filter(purpose_id=int(pid)).update(display_order=idx)
+                except (ValueError, TypeError):
+                    continue
+
+        write_audit_log(
+            request.user,
+            "REORDER_PURPOSES",
+            "tblDiscussionPurpose",
+            f"{len(order_ids)} items",
+            f"Admin {request.user.username} reordered discussion purposes via drag-and-drop."
+        )
+        return JsonResponse({'status': 'ok', 'message': 'Discussion purposes order updated successfully.'})
+
+    return JsonResponse({'error': 'POST method required'}, status=405)
+
+
+
 
 # ==========================================
 # User Account Management (Admin / SubAdmin)

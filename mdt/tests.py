@@ -395,4 +395,36 @@ class PeadMDTTests(TestCase):
         self.assertEqual(data['name'], 'Marrow Assessment')
         self.assertTrue(DiscussionPurpose.objects.filter(name='Marrow Assessment').exists())
 
+        # 5. Drag-and-drop Reorder Purposes via JSON API
+        p1 = DiscussionPurpose.objects.create(name='Alpha Purpose', display_order=1)
+        p2 = DiscussionPurpose.objects.create(name='Beta Purpose', display_order=2)
+        p3 = DiscussionPurpose.objects.create(name='Gamma Purpose', display_order=3)
+
+        # Non-admin forbidden
+        non_admin_client = Client()
+        non_admin_client.login(username='drtest', password='password123')
+        resp_reorder_denied = non_admin_client.post(
+            reverse('api_reorder_discussion_purposes'),
+            data={'order': [p3.purpose_id, p1.purpose_id, p2.purpose_id]},
+            content_type='application/json'
+        )
+        self.assertEqual(resp_reorder_denied.status_code, 403)
+
+        # Admin allowed
+        resp_reorder = admin_client.post(
+            reverse('api_reorder_discussion_purposes'),
+            data={'order': [p3.purpose_id, p1.purpose_id, p2.purpose_id]},
+            content_type='application/json'
+        )
+        self.assertEqual(resp_reorder.status_code, 200)
+        self.assertEqual(resp_reorder.json().get('status'), 'ok')
+
+        p1.refresh_from_db()
+        p2.refresh_from_db()
+        p3.refresh_from_db()
+        self.assertEqual(p3.display_order, 1)
+        self.assertEqual(p1.display_order, 2)
+        self.assertEqual(p2.display_order, 3)
+
+
 

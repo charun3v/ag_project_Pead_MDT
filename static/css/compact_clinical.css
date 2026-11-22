@@ -4,16 +4,16 @@
   --primary-hover: #172554;
   --secondary-color: #0284c7;
   
-  /* Warm Eye-Pleasing Beige Palette */
-  --clinical-bg: #f5f0e6;          /* Soothing, low-strain warm beige background */
-  --card-bg: #ffffff;              /* Crisp clean card background */
-  --card-border: #ded7ca;          /* Soft warm border */
-  --header-bg: #ebe4d5;            /* Gentle warm cream header */
-  --row-hover: #fbf8f2;            /* Subtle warm hover */
-  --section-bg: #f8f4ec;           /* Warm field grouping background */
+  /* Warm Eye-Pleasing Beige Palette (Darker Beige Background + Beige Cards/Inputs) */
+  --clinical-bg: #ded5c4;          /* Soothing, low-strain noticeably darker warm beige background */
+  --card-bg: #f5ede0;              /* Pleasing warm light beige card & container background */
+  --card-border: #bfae95;          /* Crisp warm tan border */
+  --header-bg: #d5c7b0;            /* Deeper warm tan header */
+  --row-hover: #ebe0ce;            /* Warm beige hover */
+  --section-bg: #eae0ce;           /* Warm field grouping background */
   
-  --text-dark: #1c1917;            /* Deep warm charcoal for readability */
-  --text-muted: #78716c;           /* Warm muted slate */
+  --text-dark: #1c1917;            /* Deep warm charcoal for high-contrast readability */
+  --text-muted: #6e655c;           /* Warm muted slate */
   --font-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -23,6 +23,53 @@ body {
   color: var(--text-dark);
   background-color: var(--clinical-bg);
   line-height: 1.4;
+}
+
+/* Global Overrides for Bootstrap elements to enforce Warm Beige Theme */
+.bg-white {
+  background-color: var(--card-bg) !important;
+}
+
+.card {
+  background-color: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+.modal-content {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+  color: var(--text-dark);
+}
+
+.modal-header {
+  background-color: var(--header-bg);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.modal-footer {
+  background-color: var(--header-bg);
+  border-top: 1px solid var(--card-border);
+}
+
+.list-group-item {
+  background-color: var(--card-bg);
+  border-color: var(--card-border);
+  color: var(--text-dark);
+}
+
+.dropdown-menu {
+  background-color: var(--card-bg);
+  border: 1px solid var(--card-border);
+}
+
+.dropdown-item {
+  color: var(--text-dark);
+  font-size: 0.82rem;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+  background-color: var(--row-hover);
+  color: var(--primary-color);
 }
 
 /* Compact Navbar */
@@ -53,7 +100,7 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(44, 39, 32, 0.05);
+  box-shadow: 0 1px 3px rgba(44, 39, 32, 0.08);
   margin-bottom: 0.85rem;
 }
 .card-clinical .card-header {
@@ -72,13 +119,20 @@ body {
 }
 
 /* Compact Tables */
+.table {
+  --bs-table-bg: var(--card-bg);
+  --bs-table-striped-bg: #eae0ce;
+  --bs-table-hover-bg: var(--row-hover);
+  --bs-table-border-color: var(--card-border);
+  color: var(--text-dark);
+}
 .table-compact {
   font-size: 0.82rem;
   margin-bottom: 0;
 }
 .table-compact th {
-  background-color: #ede6d8;
-  color: #44403c;
+  background-color: var(--header-bg);
+  color: #2e2924;
   font-weight: 600;
   padding: 0.35rem 0.5rem;
   border-bottom: 1px solid var(--card-border);
@@ -87,9 +141,10 @@ body {
 .table-compact td {
   padding: 0.35rem 0.5rem;
   vertical-align: middle;
-  border-bottom: 1px solid #f2ede4;
+  border-bottom: 1px solid var(--card-border);
+  background-color: var(--card-bg);
 }
-.table-compact tbody tr:hover {
+.table-compact tbody tr:hover td {
   background-color: var(--row-hover);
 }
 
@@ -106,17 +161,19 @@ body {
   color: #44403c;
   margin-bottom: 0.15rem;
 }
-.form-control-sm, .form-select-sm {
+.form-control, .form-select, .form-control-sm, .form-select-sm {
   font-size: 0.82rem;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  border-color: #d6cebe;
-  background-color: #ffffff;
+  border: 1px solid var(--card-border);
+  background-color: #faf4eb;
+  color: var(--text-dark);
 }
-.form-control-sm:focus, .form-select-sm:focus {
+.form-control:focus, .form-select:focus, .form-control-sm:focus, .form-select-sm:focus {
   border-color: #0284c7;
   box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.18);
-  background-color: #ffffff;
+  background-color: #fdfaf6;
+  color: var(--text-dark);
 }
 
 /* Status Badges */
@@ -169,14 +226,14 @@ body {
 
 /* Clinical Metric Tile */
 .metric-tile {
-  background: #ffffff;
+  background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 6px;
   padding: 0.6rem 0.85rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .metric-tile .metric-num {
   font-size: 1.35rem;
@@ -199,7 +256,7 @@ body {
 .nav-tabs-clinical .nav-link {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #78716c;
+  color: #6e655c;
   padding: 0.35rem 0.85rem;
   border: none;
   border-bottom: 2px solid transparent;
@@ -208,6 +265,22 @@ body {
   color: #0369a1;
   border-bottom: 2px solid #0369a1;
   background: transparent;
+}
+
+/* Drag-and-Drop Sortable Affordances */
+.sortable-ghost {
+  opacity: 0.45;
+  background-color: #d5c7b0 !important;
+}
+.sortable-chosen {
+  background-color: #e2d5bf !important;
+}
+.drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 /* Report Print Rules */

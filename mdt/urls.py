@@ -46,6 +46,7 @@ urlpatterns = [
     # Reference Lookups Management (Admin / SubAdmin)
     path('lookups/discussion-purposes/', views.manage_purposes_view, name='manage_purposes'),
     path('api/discussion-purposes/add/', views.api_add_discussion_purpose, name='api_add_discussion_purpose'),
+    path('api/discussion-purposes/reorder/', views.api_reorder_discussion_purposes, name='api_reorder_discussion_purposes'),
 
     # Audit Logs
     path('audit-log/', views.audit_log_view, name='audit_log_view'),
